@@ -75,5 +75,7 @@
 - [x] Aumentar a altura da área de edição da coluna Análise.
 - [x] Configurar Ctrl+Enter para inserir uma linha em branco na Análise.
 - [x] Republicar a melhoria no GitHub e no Netlify.
-- [ ] Inserir novos contatos no topo da Lista de Prospecção.
-- [ ] Validar e republicar a ordenação dos novos contatos.
+- [x] Inserir novos contatos no topo da Lista de Prospecção.
+- [x] Validar e republicar a ordenação dos novos contatos.
+- [ ] Usar o padrão `Lista - Mês - Sem N` ao criar novas listas de prospecção.
+- [ ] Validar e republicar o novo padrão de nomes.

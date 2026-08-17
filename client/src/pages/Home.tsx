@@ -633,7 +633,10 @@ export default function Home() {
   }
 
   function createProspectList() {
-    const nextList = { id: uniqueId("prospect-list"), name: `Nova lista ${prospectLists.length + 1}`, records: [] };
+    const now = new Date();
+    const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    const weekOfMonth = Math.floor((now.getDate() - 1) / 7) + 1;
+    const nextList = { id: uniqueId("prospect-list"), name: `Lista - ${monthNames[now.getMonth()]} - Sem ${weekOfMonth}`, records: [] };
     setProspectLists((current) => [...current, nextList]);
     setActiveProspectListId(nextList.id);
     toast.success("Nova lista criada.");
