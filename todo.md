@@ -47,3 +47,5 @@
 - [x] Conta GitHub identificada no navegador: `livonnobr`; a credencial local do GitHub CLI foi renovada por autorização de dispositivo.
 - [x] Segunda ativação por dispositivo do GitHub CLI concluída, iniciada sem abertura de navegador local, para disponibilizar a credencial ao terminal.
 - [x] Incluir `https://jocular-profiterole-c5dafc.netlify.app` nas URLs de redirecionamento de autenticação do projeto Supabase; configuração confirmada pelo usuário no painel Supabase.
+- [x] Renomear o indicador Ponderado para Previsão no funil.
+- [x] Corrigir a soltura de oportunidades em Ganho e Perdido para atualizar o negócio e finalizar o arraste.
