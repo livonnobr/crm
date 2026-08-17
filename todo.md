@@ -7,6 +7,8 @@
 - [x] Unificar os controles e indicadores do cabeçalho do funil em uma única linha no desktop.
 - [x] Garantir a exibição de Ganho e Perdido como destinos ativos durante o arraste de um card.
 - [x] Ativar a aba Atividades com uma visão de tarefas comerciais do funil.
+- [x] Calibrar as probabilidades das etapas do funil conforme a conversão real de leads até contratos fechados.
+- [x] Exibir o faturamento estimado em verde no cabeçalho de cada coluna do funil.
 
 - [x] Implementar a barra lateral recolhível com expansão ao passar o mouse.
 - [x] Reduzir o cabeçalho do funil para priorizar o quadro de oportunidades.

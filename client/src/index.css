@@ -85,13 +85,17 @@
   .pipeline-shell > header .page-title { @apply m-0 text-[19px] tracking-[-0.045em] sm:text-[21px]; }
   .pipeline-shell > header .mt-6 { @apply mt-2; }
   .pipeline-shell > header .tool-button { @apply h-9; }
-  .metric-instrument { min-width: 102px; box-shadow: inset 0 1px 0 rgba(255,255,255,.88), 0 6px 18px rgba(42,57,49,.04); }
+  .metric-instrument { min-width: 108px; box-shadow: inset 0 1px 0 rgba(255,255,255,.88), 0 7px 20px rgba(42,57,49,.05); }
   .metric-instrument > p:last-child { font-family: "Manrope", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.045em; }
-  .pipeline-column { @apply relative w-[260px] rounded-2xl border border-[#E0E6E0] bg-[#EDF1ED]/75 p-3 transition duration-150; box-shadow: inset 0 2px 0 rgba(255,255,255,.84), inset 0 -1px 0 rgba(119,145,139,.08), 0 8px 22px rgba(37,55,44,.025); }
+  .pipeline-column { @apply relative w-[260px] rounded-2xl border border-[#DDE5DF] p-3 transition duration-150; background: linear-gradient(180deg, rgba(245,248,245,.96) 0%, rgba(237,241,237,.82) 31%, rgba(237,241,237,.72) 100%); box-shadow: inset 0 2px 0 rgba(255,255,255,.9), inset 0 -1px 0 rgba(119,145,139,.1), 0 10px 25px rgba(37,55,44,.035); }
   .pipeline-column::before { content: ""; position: absolute; left: 1rem; right: 1rem; top: 3.9rem; height: 1px; background: linear-gradient(90deg, rgba(154,171,161,.5), rgba(154,171,161,.08)); }
   .pipeline-column > header { position: relative; padding-bottom: .85rem; }
   .pipeline-column > header p { font-size: 10px; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; color: #7A8881; }
   .pipeline-column > p { font-family: "Manrope", sans-serif; font-variant-numeric: tabular-nums; font-size: 15px; letter-spacing: -0.045em; }
+  .column-instrument-grid { border-top: 1px solid #D9E4DC; border-bottom: 1px solid #D9E4DC; background: rgba(255,255,255,.34); }
+  .column-value, .column-estimated-value > p:last-child { font-family: "Manrope", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.045em; }
+  .column-estimated-value { position: relative; }
+  .column-estimated-value::before { content: ""; position: absolute; top: .55rem; left: -1px; width: 2px; height: 1.5rem; border-radius: 9999px; background: #10A97A; opacity: .72; }
   .pipeline-column-over { @apply border-[#10A97A] bg-[#E6F5EE] shadow-[inset_0_0_0_1px_rgba(16,169,122,0.1)]; }
   .stage-add-button { @apply flex min-h-[120px] w-[170px] items-center justify-center gap-2 self-start rounded-2xl border border-dashed border-[#C9D5CD] bg-[#FAFBF9]/70 px-5 text-sm font-bold text-[#63706B] transition hover:border-[#10A97A] hover:bg-[#E8F6F0] hover:text-[#087E5A] active:scale-[0.98]; }
   .deal-card { @apply cursor-grab rounded-xl border border-[#E0E6E0] border-l-[3px] border-l-[#10A97A] bg-[#FCFCFA] p-3.5 shadow-[0_5px_13px_rgba(29,46,36,0.04)] transition duration-150 hover:-translate-y-0.5 hover:border-[#C4D3CB] hover:shadow-[0_12px_22px_rgba(29,46,36,0.08)] active:cursor-grabbing active:scale-[0.98]; }

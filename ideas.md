@@ -89,3 +89,5 @@ Os dados ficarão inicialmente no navegador por meio de armazenamento local. A c
 - Números, percentuais e prazos devem seguir a hierarquia técnica de Manrope/DM Sans: labels compactos, valores instrumentais e baixa dependência de decoração.
 - Os totais do funil funcionam como instrumentos de leitura rápida: rótulos compactos, valores em Manrope e um ponto de pulso reservado ao pipeline ponderado.
 - As zonas de decisão de ganho e perda usam superfícies claras, bordas pontilhadas e cor apenas como sinal operacional; no arraste, a cor se intensifica para confirmar o destino sem competir com o quadro.
+- Cada etapa expõe valor em aberto e previsão ponderada como um pequeno instrumento: o valor estimado em Verde Ritmo traduz a probabilidade da etapa em receita potencial.
+- As superfícies do funil usam planos claros, bordas precisas e profundidade mínima para reforçar a sensação de bancada operacional sem diluir o minimalismo tátil.
