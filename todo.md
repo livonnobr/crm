@@ -49,3 +49,4 @@
 - [x] Incluir `https://jocular-profiterole-c5dafc.netlify.app` nas URLs de redirecionamento de autenticação do projeto Supabase; configuração confirmada pelo usuário no painel Supabase.
 - [x] Renomear o indicador Ponderado para Previsão no funil.
 - [x] Corrigir a soltura de oportunidades em Ganho e Perdido para atualizar o negócio e finalizar o arraste.
+- [x] Adicionar ícone de lixeira visível em cada card de negócio, com confirmação antes da exclusão.
