@@ -2,8 +2,6 @@
 
 - [x] Conferir o deploy ativo do Netlify e republicar a versão correta, se necessário.
 - [x] Sincronizar a versão atual no GitHub e publicar a mesma compilação no Netlify.
-- [ ] Manter GitHub e Netlify como destinos oficiais de publicação e remover a visibilidade pública no Manus, se a configuração permitir.
-- [ ] Corrigir a defasagem entre a versão atual, a branch `ritmo-crm` do GitHub e o deploy do Netlify.
 - [x] Reduzir o espaço superior do funil e exibir zonas de decisão Ganho e Perdido durante o arraste.
 - [x] Ampliar o painel de detalhes da oportunidade para leitura e edição confortável em desktop.
 - [x] Unificar os controles e indicadores do cabeçalho do funil em uma única linha no desktop.
