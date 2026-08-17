@@ -5,7 +5,7 @@
 - [x] Integrar a interface do CRM ao Supabase com autenticação por e-mail.
 - [x] Conectar a conta Netlify e criar o site do CRM.
 - [ ] Configurar o SPA e as URLs de redirecionamento de autenticação para o domínio Netlify.
-- [ ] Criar ou sincronizar o repositório GitHub do projeto.
+- [ ] Sincronizar o CRM na branch `ritmo-crm` do repositório existente `livonnobr/crm`.
 - [ ] Validar compilação, fluxo de dados e publicação externa no Netlify.
 
 ## Histórico
