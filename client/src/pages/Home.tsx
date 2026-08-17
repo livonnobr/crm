@@ -52,7 +52,19 @@ import { Label } from "@/components/ui/label";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { getSupabaseClient, isSupabaseConfigured, supabase } from "@/lib/supabase";
 
-type Page = "goals" | "pipeline" | "activities";
+type Page = "goals" | "pipeline" | "activities" | "prospecting";
+
+type ProspectRecord = {
+  id: string;
+  decisionMakerFirstName: string;
+  decisionMakerLastName: string;
+  decisionMakerEmail: string;
+  decisionMakerPhone: string;
+  company: string;
+  companyWebsite: string;
+  analysis: string;
+};
+
 type GoalType = "Prospecção" | "Vendas";
 type GoalUnit = "atividades" | "R$";
 
@@ -262,6 +274,19 @@ const blankGoal: GoalItem = {
   color: "emerald",
 };
 
+const initialProspects: ProspectRecord[] = [];
+
+const blankProspect: ProspectRecord = {
+  id: "",
+  decisionMakerFirstName: "",
+  decisionMakerLastName: "",
+  decisionMakerEmail: "",
+  decisionMakerPhone: "",
+  company: "",
+  companyWebsite: "",
+  analysis: "",
+};
+
 const blankDeal: Deal = {
   id: "",
   title: "",
@@ -322,13 +347,14 @@ function isLostStage(stage: Stage) {
 export default function Home() {
   const [page, setPage] = useState<Page>(() => {
     const tab = new URLSearchParams(window.location.search).get("aba");
-    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : "goals";
+    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : tab === "prospeccao" ? "prospecting" : "goals";
   });
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [isSidebarHovering, setIsSidebarHovering] = useState(false);
   const [goals, setGoals] = useState<GoalItem[]>(() => storedValue("ritmo-goals", initialGoals));
   const [funnels, setFunnels] = useState<SalesFunnel[]>(() => storedValue("ritmo-funnels", initialFunnels));
   const [deals, setDeals] = useState<Deal[]>(() => storedValue("ritmo-deals", initialDeals));
+  const [prospects, setProspects] = useState<ProspectRecord[]>(() => storedValue("ritmo-prospects", initialProspects));
   const [activeFunnelId, setActiveFunnelId] = useState(() => storedValue("ritmo-active-funnel", "primary-funnel"));
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
@@ -501,6 +527,10 @@ export default function Home() {
   }, [activeFunnelId, workspaceId]);
 
   useEffect(() => {
+    if (!workspaceId) window.localStorage.setItem("ritmo-prospects", JSON.stringify(prospects));
+  }, [prospects, workspaceId]);
+
+  useEffect(() => {
     if (!workspaceId || !supabase || isCloudHydrating) return;
     const client = getSupabaseClient();
     const stageToFunnel = new Map(funnels.flatMap((funnel) => funnel.stages.map((stage) => [stage.id, funnel.id] as const)));
@@ -544,8 +574,22 @@ export default function Home() {
     setPage(nextPage);
     const url = new URL(window.location.href);
     if (nextPage === "goals") url.searchParams.delete("aba");
-    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : "atividades");
+    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : "prospeccao");
     window.history.replaceState({}, "", url);
+  }
+
+  function addProspect() {
+    setProspects((current) => [...current, { ...blankProspect, id: uniqueId("prospect") }]);
+    toast.success("Nova linha adicionada à lista de prospecção.");
+  }
+
+  function updateProspect(id: string, field: keyof Omit<ProspectRecord, "id">, value: string) {
+    setProspects((current) => current.map((prospect) => (prospect.id === id ? { ...prospect, [field]: value } : prospect)));
+  }
+
+  function deleteProspect(id: string) {
+    setProspects((current) => current.filter((prospect) => prospect.id !== id));
+    toast.success("Contato removido da lista.");
   }
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
@@ -909,6 +953,7 @@ export default function Home() {
             <SidebarItem icon={<GitBranch size={19} />} label="Funil de vendas" active={page === "pipeline"} onClick={() => selectPage("pipeline")} />
             <SidebarItem icon={<Users size={19} />} label="Pessoas" onClick={() => toast.info("Pessoas entra na próxima etapa do CRM.")} />
             <SidebarItem icon={<Calendar size={19} />} label="Atividades" active={page === "activities"} onClick={() => selectPage("activities")} />
+            <SidebarItem icon={<ClipboardList size={19} />} label="Lista de Prospecção" active={page === "prospecting"} onClick={() => selectPage("prospecting")} />
           </SidebarMenu>
         </SidebarGroup>
 
@@ -954,7 +999,7 @@ export default function Home() {
           <img className="h-8 w-8 rounded-lg" src={logoUrl} alt="" />
           <span className="font-display text-lg font-extrabold tracking-[-0.06em]">ritmo</span>
         </div>
-        <button onClick={page === "goals" ? openNewGoal : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
+        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" ? addProspect : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
           <Plus className="h-5 w-5" />
         </button>
       </div>
@@ -998,8 +1043,10 @@ export default function Home() {
             onDragOver={allowDrop}
             onDragEnd={clearDragState}
           />
-        ) : (
+        ) : page === "activities" ? (
           <ActivitiesWorkspace deals={openDeals} onToggleActivity={toggleWorkspaceActivity} onOpenDeal={openDealDetail} onNewDeal={openNewDeal} />
+        ) : (
+          <ProspectingWorkspace prospects={prospects} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} />
         )}
       </main>
 
@@ -1227,6 +1274,52 @@ function GoalRow({ goal, onEdit, onDelete }: { goal: GoalItem; onEdit: () => voi
   const progress = progressOf(goal);
   const styles = { emerald: "bg-[#10A97A]", blue: "bg-[#4386B6]", amber: "bg-[#D8952E]", violet: "bg-[#9075B5]" };
   return <div className="group grid gap-4 rounded-2xl border border-[#E7EBE6] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8D0] hover:shadow-[0_12px_28px_rgba(30,55,44,0.05)] sm:grid-cols-[auto_minmax(190px,1fr)_minmax(175px,0.6fr)_auto] sm:items-center"><div className="goal-meter" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div><div className="mb-1 flex flex-wrap items-center gap-2"><span className="tag-chip">{goal.type}</span><span className="text-xs text-[#88938E]">{goal.period}</span></div><h3 className="font-display text-base font-bold tracking-[-0.025em] text-[#27302D]">{goal.title}</h3></div><div><div className="mb-2 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#35403B]">{formatGoalValue(goal.actual, goal.unit)}</span><span className="text-xs font-medium text-[#7D8983]">de {formatGoalValue(goal.target, goal.unit)}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className={`h-full rounded-full ${styles[goal.color]}`} style={{ width: `${progress}%` }} /></div></div><div className="flex justify-end gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100"><button onClick={onEdit} className="icon-button" aria-label={`Editar ${goal.title}`}><Pencil size={15} /></button><button onClick={onDelete} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${goal.title}`}><Trash2 size={15} /></button></div></div>;
+}
+
+function ProspectingMetric({ label, value, detail, accent = false }: { label: string; value: string; detail: string; accent?: boolean }) {
+  return <div className="rounded-2xl border border-[#DDE5DE] bg-[#FCFCFA] px-4 py-3 shadow-[0_8px_22px_rgba(43,61,53,0.04)]"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">{label}</span><span className={`h-1.5 w-1.5 rounded-full ${accent ? "bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.11)]" : "bg-[#A6B2AB]"}`} /></div><div className={`mt-2 font-display text-2xl font-extrabold tracking-[-0.05em] ${accent ? "text-[#087E5A]" : "text-[#27302D]"}`}>{value}</div><p className="mt-0.5 text-xs font-medium text-[#87938D]">{detail}</p></div>;
+}
+
+function ProspectingWorkspace({ prospects, onAdd, onUpdate, onDelete }: { prospects: ProspectRecord[]; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void }) {
+  const columns: Array<{ key: keyof Omit<ProspectRecord, "id">; label: string; width: string; multiline?: boolean }> = [
+    { key: "decisionMakerFirstName", label: "Nome do decisor", width: "min-w-[170px]" },
+    { key: "decisionMakerLastName", label: "Sobrenome do decisor", width: "min-w-[190px]" },
+    { key: "decisionMakerEmail", label: "E-mail do decisor", width: "min-w-[230px]" },
+    { key: "decisionMakerPhone", label: "Telefone do decisor", width: "min-w-[180px]" },
+    { key: "company", label: "Empresa", width: "min-w-[190px]" },
+    { key: "companyWebsite", label: "Site da empresa", width: "min-w-[230px]" },
+    { key: "analysis", label: "Análise", width: "min-w-[340px]", multiline: true },
+  ];
+  const analyzedCount = prospects.filter((prospect) => prospect.analysis.trim()).length;
+  const companyCount = prospects.filter((prospect) => prospect.company.trim()).length;
+  const contactableCount = prospects.filter((prospect) => prospect.decisionMakerEmail.trim() || prospect.decisionMakerPhone.trim()).length;
+
+  return <div className="min-h-screen bg-[#F6F5F1] px-5 pb-8 pt-[92px] md:px-8 md:pt-8">
+    <div className="mx-auto max-w-[1600px]">
+      <header className="flex flex-col gap-4 border-b border-[#E2E7E1] pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div><p className="eyebrow">Prospecção comercial</p><div className="mt-1 flex items-center gap-2"><h1 className="page-title">Lista de Prospecção</h1><span className="h-2 w-2 rounded-full bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.12)]" /></div><p className="mt-2 text-sm text-[#728079]">Organize decisores, empresas e hipóteses de abordagem em uma única mesa de trabalho.</p></div>
+        <Button onClick={onAdd} className="h-10 gap-2 self-start rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A] sm:self-auto"><Plus size={18} />Nova linha</Button>
+      </header>
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <ProspectingMetric label="Contatos na bancada" value={prospects.length.toString()} detail="linhas de prospecção" />
+        <ProspectingMetric label="Com canal de contato" value={contactableCount.toString()} detail="e-mail ou telefone preenchido" accent />
+        <ProspectingMetric label="Com análise registrada" value={analyzedCount.toString()} detail={`${companyCount} ${companyCount === 1 ? "empresa identificada" : "empresas identificadas"}`} />
+      </div>
+      <section className="mt-4 overflow-hidden rounded-2xl border border-[#DDE5DE] bg-white shadow-[0_14px_40px_rgba(43,61,53,0.06)]">
+        <div className="flex flex-col gap-3 border-b border-[#E5EAE5] bg-[#FBFCFA] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><div className="flex items-center gap-2"><p className="text-sm font-extrabold text-[#27302D]">Base de contatos</p><span className="h-1.5 w-1.5 rounded-full bg-[#10A97A]" /></div><p className="mt-1 text-xs text-[#7B8882]">{prospects.length} {prospects.length === 1 ? "registro" : "registros"} · edição direta na bancada</p></div><div className="flex items-center gap-2"><span className="hidden text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#87938D] sm:inline">Tabuleiro operacional</span><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-extrabold text-[#087E5E]">Rascunho comercial</span></div></div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1500px] border-collapse text-left">
+            <thead><tr className="border-b border-[#DDE5DE] bg-[#F4F7F3]">{columns.map((column) => <th key={column.key} className={`${column.width} px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#75837C]`}>{column.label}</th>)}<th className="w-14 px-3 py-3" aria-label="Ações" /></tr></thead>
+            <tbody>{prospects.map((prospect, index) => <tr key={prospect.id} className="group border-b border-[#E8EDE8] align-top transition hover:bg-[#FBFDFB]">
+              {columns.map((column) => <td key={column.key} className="px-2 py-2"><label className="sr-only">{column.label} — linha {index + 1}</label>{column.multiline ? <textarea value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} placeholder="Escreva sua hipótese, contexto e próximo passo…" className="min-h-[92px] w-full resize-y rounded-lg border border-transparent bg-transparent px-2 py-2 text-sm leading-5 text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" /> : <input value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} placeholder="Preencher" type={column.key === "decisionMakerEmail" ? "email" : "text"} className="h-10 w-full rounded-lg border border-transparent bg-transparent px-2 text-sm text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" />}</td>)}
+              <td className="px-2 py-2"><button type="button" onClick={() => { if (window.confirm("Remover este contato da lista?")) onDelete(prospect.id); }} className="mt-1 grid h-9 w-9 place-items-center rounded-lg text-[#A0AAA4] opacity-60 transition hover:bg-[#FCEDEB] hover:text-[#B94D45] group-hover:opacity-100" aria-label={`Excluir linha ${index + 1}`}><Trash2 size={16} /></button></td>
+            </tr>)}</tbody>
+          </table>
+          {!prospects.length && <div className="px-6 py-16 text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={23} /></div><p className="mt-4 font-display text-xl font-extrabold tracking-[-0.03em] text-[#27302D]">Sua lista começa aqui</p><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#78857F]">Adicione uma linha para registrar o decisor, a empresa e a leitura comercial que vai orientar sua abordagem.</p><Button onClick={onAdd} className="mt-5 h-10 rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A]"><Plus size={17} />Adicionar primeiro contato</Button></div>}
+        </div>
+      </section>
+    </div>
+  </div>;
 }
 
 function PipelineWorkspace({ funnels, activeFunnel, activeFunnelId, deals, wonDeals, lostDeals, wonStage, lostStage, totalPipeline, weightedPipeline, draggedDealId, overStageId, onSelectFunnel, onNewFunnel, onEditFunnel, onNewDeal, onEditDeal, onDeleteDeal, onNewStage, onEditStage, onDragStart, onDrop, onWinDrop, onLoseDrop, onDragOver, onDragEnd }: { funnels: SalesFunnel[]; activeFunnel?: SalesFunnel; activeFunnelId: string; deals: Deal[]; wonDeals: Deal[]; lostDeals: Deal[]; wonStage?: Stage; lostStage?: Stage; totalPipeline: number; weightedPipeline: number; draggedDealId: string | null; overStageId: string | null; onSelectFunnel: (id: string) => void; onNewFunnel: () => void; onEditFunnel: () => void; onNewDeal: () => void; onEditDeal: (deal: Deal) => void; onDeleteDeal: (deal: Deal) => void; onNewStage: () => void; onEditStage: (stage: Stage) => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onDrop: (stageId: string, event?: DragEvent<HTMLElement>) => void; onWinDrop: (event?: DragEvent<HTMLElement>) => void; onLoseDrop: (event?: DragEvent<HTMLElement>) => void; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDragEnd: () => void }) {

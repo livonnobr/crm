@@ -50,7 +50,12 @@
 - [x] Renomear o indicador Ponderado para Previsão no funil.
 - [x] Corrigir a soltura de oportunidades em Ganho e Perdido para atualizar o negócio e finalizar o arraste.
 - [x] Adicionar ícone de lixeira visível em cada card de negócio, com confirmação antes da exclusão.
-- [ ] Publicar a melhoria da lixeira no GitHub e no Netlify; não usar Manus como destino de produção.
+- [x] Publicar a melhoria da lixeira no GitHub e no Netlify; não usar Manus como destino de produção.
 - [ ] Registrar que mudanças de esquema ou dados estruturais devem ser aplicadas no Supabase; mudanças apenas de frontend não exigem nova migração.
-- [ ] Após a reconexão, validar a sessão do GitHub e enviar o branch `ritmo-crm`.
-- [ ] Confirmar no remoto que o commit mais recente contém a versão publicada no Netlify.
+- [ ] Definir a fonte de dados para visitas mensais de URLs na nova aba Análise.
+- [ ] Pesquisar APIs de estimativa de tráfego para domínios públicos, incluindo histórico mensal e condições de uso.
+- [ ] Implementar e publicar a aba Análise no GitHub e no Netlify.
+- [ ] Implementar a aba Lista de Prospecção em formato de planilha editável.
+- [ ] Adicionar campos de decisor, contato, empresa, site e análise comercial.
+- [x] Após a reconexão, validar a sessão do GitHub e enviar o branch `ritmo-crm`.
+- [x] Confirmar no remoto que o commit mais recente contém a versão publicada no Netlify.
