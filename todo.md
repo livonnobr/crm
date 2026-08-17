@@ -123,3 +123,12 @@
 - [ ] Identificar e executar a próxima solicitação pendente do backlog antes da integração Google Agenda/Meet.
 
 - [x] Renomear visualmente Lista de Prospecção para Empresas e validar o cabeçalho compacto.
+
+## Aba Cadência
+
+- [x] Criar a aba Cadência abaixo de Empresas no menu lateral.
+- [x] Implementar uma grade por dias e turnos inspirada no exemplo fornecido.
+- [x] Permitir criar, editar, mover e excluir blocos de atividade por arraste.
+- [x] Persistir a configuração da Cadência no Supabase e manter fallback local.
+- [x] Aplicar o padrão visual ivory, graphite e emerald do Ritmo CRM.
+- [ ] Validar responsividade e publicar a Cadência no GitHub e no Netlify.

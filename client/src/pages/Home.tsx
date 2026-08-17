@@ -55,7 +55,7 @@ import { Label } from "@/components/ui/label";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { getSupabaseClient, isSupabaseConfigured, supabase } from "@/lib/supabase";
 
-type Page = "goals" | "pipeline" | "activities" | "prospecting";
+type Page = "goals" | "pipeline" | "activities" | "prospecting" | "cadence";
 
 type ProspectRecord = {
   id: string;
@@ -117,6 +117,28 @@ type DealActivity = {
   subject: string;
   dueAt: string;
   done: boolean;
+};
+
+type CadenceSlot = "morning" | "afternoon";
+type CadenceChannel = "E-mail" | "WhatsApp" | "Ligação" | "Tarefa";
+type CadenceBlock = {
+  id: string;
+  day: number;
+  slot: CadenceSlot;
+  title: string;
+  channel: CadenceChannel;
+  notes: string;
+};
+
+type CadenceBlockRow = {
+  id: string;
+  workspace_id: string;
+  day: number;
+  slot: CadenceSlot;
+  title: string;
+  channel: CadenceChannel;
+  notes: string;
+  position: number;
 };
 
 type DealNote = {
@@ -311,6 +333,14 @@ const initialProspects: ProspectRecord[] = [];
 
 const initialProspectLists: ProspectList[] = [{ id: "prospect-list-default", name: "Lista principal", records: initialProspects }];
 
+const initialCadenceBlocks: CadenceBlock[] = [
+  { id: "cadence-1", day: 1, slot: "morning", title: "Introdução", channel: "E-mail", notes: "Apresentar a empresa e contexto inicial." },
+  { id: "cadence-2", day: 2, slot: "afternoon", title: "Follow-up", channel: "WhatsApp", notes: "Retomar contato e validar interesse." },
+  { id: "cadence-3", day: 3, slot: "morning", title: "Follow-up", channel: "WhatsApp", notes: "Enviar prova social ou material relevante." },
+  { id: "cadence-4", day: 4, slot: "afternoon", title: "Ligação consultiva", channel: "Ligação", notes: "Entender momento e próximo passo." },
+  { id: "cadence-5", day: 6, slot: "morning", title: "Break-up", channel: "E-mail", notes: "Última tentativa com saída elegante." },
+];
+
 function storedProspectLists() {
   const savedLists = storedValue<ProspectList[] | null>("ritmo-prospect-lists", null);
   if (Array.isArray(savedLists) && savedLists.length) return savedLists.filter((list) => !list.deletedAt);
@@ -438,7 +468,7 @@ export default function Home() {
 
   const [page, setPage] = useState<Page>(() => {
     const tab = new URLSearchParams(window.location.search).get("aba");
-    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : tab === "prospeccao" ? "prospecting" : "goals";
+    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : tab === "cadencia" ? "cadence" : tab === "prospeccao" ? "prospecting" : "goals";
   });
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [isSidebarHovering, setIsSidebarHovering] = useState(false);
@@ -448,6 +478,9 @@ export default function Home() {
   const [deals, setDeals] = useState<Deal[]>(() => storedValue<Deal[]>("ritmo-deals", initialDeals).map((deal) => ({ ...deal, stageHistory: deal.stageHistory?.length ? deal.stageHistory : [deal.stageId] })));
   const [prospectLists, setProspectLists] = useState<ProspectList[]>(() => storedProspectLists());
   const [trashedProspectLists, setTrashedProspectLists] = useState<TrashedProspectList[]>(() => storedTrashedProspectLists());
+  const [cadenceBlocks, setCadenceBlocks] = useState<CadenceBlock[]>(() => storedValue("ritmo-cadence-blocks", initialCadenceBlocks));
+  const [draggedCadenceId, setDraggedCadenceId] = useState<string | null>(null);
+  const [cadenceEditId, setCadenceEditId] = useState<string | null>(null);
   const [activeProspectListId, setActiveProspectListId] = useState(() => storedValue("ritmo-active-prospect-list", "prospect-list-default"));
   const [activeFunnelId, setActiveFunnelId] = useState(() => storedValue("ritmo-active-funnel", "primary-funnel"));
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
@@ -469,6 +502,7 @@ export default function Home() {
   const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
   const [overStageId, setOverStageId] = useState<string | null>(null);
   const [detailDealId, setDetailDealId] = useState<string | null>(null);
+  const cadenceEditBlock = cadenceBlocks.find((block) => block.id === cadenceEditId) ?? null;
 
   async function loadCloudWorkspace(userId: string) {
     if (!supabase) return;
@@ -504,15 +538,16 @@ export default function Home() {
       currentWorkspaceId = createdWorkspace.id as string;
     }
 
-    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }] = await Promise.all([
+    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }] = await Promise.all([
       client.from("goals").select("id, title, goal_type, target, actual, unit, period, color").eq("workspace_id", currentWorkspaceId).order("created_at", { ascending: false }),
       client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
       client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
       client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
       client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_email, decision_maker_phone, company, company_website, analysis, position").order("position"),
+      client.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
     ]);
 
-    if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError) {
+    if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError || cadenceBlocksError) {
       toast.error("Não foi possível carregar os dados salvos.");
       setIsCloudLoading(false);
       setIsCloudHydrating(false);
@@ -545,6 +580,8 @@ export default function Home() {
     const hasCloudProspectData = cloudProspectLists.length > 0;
     const normalizedProspectLists = (hasCloudProspectData ? cloudProspectLists.filter((list) => !list.deletedAt) : prospectLists).map(({ deletedAt: _deletedAt, ...list }) => list);
     const normalizedProspectTrash = hasCloudProspectData ? cloudProspectLists.filter((list): list is TrashedProspectList => Boolean(list.deletedAt && new Date(list.deletedAt).getTime() > Date.now() - PROSPECT_TRASH_RETENTION_MS)) : trashedProspectLists;
+
+    const normalizedCadenceBlocks = ((cadenceBlockRows ?? []) as CadenceBlockRow[]).map((block) => ({ id: block.id, day: Number(block.day), slot: block.slot, title: block.title, channel: block.channel, notes: block.notes }));
 
     const normalizedGoals = ((goalRows ?? []) as GoalRecord[]).map((goal) => ({
       id: goal.id,
@@ -589,6 +626,7 @@ export default function Home() {
     setFunnels(normalizedFunnels);
     setConversionRates({ ...defaultConversionRates(normalizedFunnels), ...((conversionSettingsRow as ConversionSettingsRecord | null)?.rates ?? {}) });
     setDeals(normalizedDeals);
+    setCadenceBlocks(normalizedCadenceBlocks.length ? normalizedCadenceBlocks : initialCadenceBlocks);
     setProspectLists(normalizedProspectLists.length ? normalizedProspectLists : initialProspectLists);
     setTrashedProspectLists(normalizedProspectTrash);
     setActiveProspectListId(normalizedProspectLists[0]?.id ?? initialProspectLists[0].id);
@@ -654,8 +692,9 @@ export default function Home() {
       window.localStorage.setItem("ritmo-prospect-lists", JSON.stringify(prospectLists));
       window.localStorage.setItem("ritmo-prospect-trash", JSON.stringify(trashedProspectLists));
       window.localStorage.setItem("ritmo-active-prospect-list", activeProspectListId);
+      window.localStorage.setItem("ritmo-cadence-blocks", JSON.stringify(cadenceBlocks));
     }
-  }, [prospectLists, trashedProspectLists, activeProspectListId, workspaceId]);
+  }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, workspaceId]);
 
   useEffect(() => {
     if (!workspaceId || !supabase || isCloudHydrating) return;
@@ -709,9 +748,15 @@ export default function Home() {
         if (staleRecordIds.length) await client.from("prospect_records").delete().in("id", staleRecordIds);
       }
       if (prospectRecordRows.length) await client.from("prospect_records").upsert(prospectRecordRows);
+
+      const { data: existingCadenceBlocks } = await client.from("cadence_blocks").select("id").eq("workspace_id", workspaceId);
+      const cadenceIds = cadenceBlocks.map((block) => block.id);
+      const staleCadenceIds = ((existingCadenceBlocks ?? []) as Array<{ id: string }>).map((block) => block.id).filter((id) => !cadenceIds.includes(id));
+      if (staleCadenceIds.length) await client.from("cadence_blocks").delete().in("id", staleCadenceIds);
+      if (cadenceBlocks.length) await client.from("cadence_blocks").upsert(cadenceBlocks.map((block, position) => ({ id: block.id, workspace_id: workspaceId, day: block.day, slot: block.slot, title: block.title, channel: block.channel, notes: block.notes, position, updated_at: new Date().toISOString() })));
     };
     void syncCloudState();
-  }, [goals, funnels, deals, conversionRates, workspaceId, isCloudHydrating]);
+  }, [goals, funnels, deals, conversionRates, cadenceBlocks, workspaceId, isCloudHydrating]);
 
   const activeFunnel = funnels.find((funnel) => funnel.id === activeFunnelId) ?? funnels[0];
   const funnelDeals = useMemo(
@@ -740,8 +785,29 @@ export default function Home() {
     setPage(nextPage);
     const url = new URL(window.location.href);
     if (nextPage === "goals") url.searchParams.delete("aba");
-    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : "prospeccao");
+    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : nextPage === "cadence" ? "cadencia" : "prospeccao");
     window.history.replaceState({}, "", url);
+  }
+
+  function addCadenceBlock(day: number, slot: CadenceSlot) {
+    if (cadenceBlocks.some((block) => block.day === day && block.slot === slot)) { toast.info("Essa célula já tem uma ação."); return; }
+    const nextBlock: CadenceBlock = { id: uniqueId("cadence"), day, slot, title: "Nova ação", channel: "Tarefa", notes: "Defina o próximo passo comercial." };
+    setCadenceBlocks((current) => [...current, nextBlock]);
+    toast.success("Ação adicionada à cadência.");
+  }
+
+  function moveCadenceBlock(id: string, day: number, slot: CadenceSlot) {
+    setCadenceBlocks((current) => current.some((block) => block.id !== id && block.day === day && block.slot === slot) ? current : current.map((block) => block.id === id ? { ...block, day, slot } : block));
+  }
+
+  function editCadenceBlock(nextBlock: CadenceBlock) {
+    setCadenceBlocks((current) => current.map((block) => block.id === nextBlock.id ? nextBlock : block));
+    toast.success("Ação da cadência atualizada.");
+  }
+
+  function deleteCadenceBlock(id: string) {
+    setCadenceBlocks((current) => current.filter((block) => block.id !== id));
+    toast.success("Ação removida da cadência.");
   }
 
   function addProspect() {
@@ -1174,6 +1240,7 @@ export default function Home() {
             <SidebarItem icon={<Users size={19} />} label="Pessoas" onClick={() => toast.info("Pessoas entra na próxima etapa do CRM.")} />
             <SidebarItem icon={<Calendar size={19} />} label="Atividades" active={page === "activities"} onClick={() => selectPage("activities")} />
             <SidebarItem icon={<ClipboardList size={19} />} label="Empresas" active={page === "prospecting"} onClick={() => selectPage("prospecting")} />
+            <SidebarItem icon={<GitBranch size={19} />} label="Cadência" active={page === "cadence"} onClick={() => selectPage("cadence")} />
           </SidebarMenu>
         </SidebarGroup>
 
@@ -1219,7 +1286,7 @@ export default function Home() {
           <img className="h-8 w-8 rounded-lg" src={logoUrl} alt="" />
           <span className="font-display text-lg font-extrabold tracking-[-0.06em]">ritmo</span>
         </div>
-        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" ? addProspect : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
+        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" ? addProspect : page === "cadence" ? () => addCadenceBlock(1, "morning") : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
           <Plus className="h-5 w-5" />
         </button>
       </div>
@@ -1268,6 +1335,8 @@ export default function Home() {
           />
         ) : page === "activities" ? (
           <ActivitiesWorkspace deals={openDeals} onToggleActivity={toggleWorkspaceActivity} onOpenDeal={openDealDetail} onNewDeal={openNewDeal} />
+        ) : page === "cadence" ? (
+          <CadenceWorkspace blocks={cadenceBlocks} onAdd={addCadenceBlock} onMove={moveCadenceBlock} onEdit={editCadenceBlock} onDelete={deleteCadenceBlock} />
         ) : (
           <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} />
         )}
@@ -1614,6 +1683,39 @@ function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListNam
         </div>
       </section>
     </div>
+  </div>;
+}
+
+function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks: CadenceBlock[]; onAdd: (day: number, slot: CadenceSlot) => void; onMove: (id: string, day: number, slot: CadenceSlot) => void; onEdit: (block: CadenceBlock) => void; onDelete: (id: string) => void }) {
+  const [draft, setDraft] = useState<CadenceBlock | null>(null);
+  const weekdays = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo", "segunda", "terça", "quarta"];
+  const channels: CadenceChannel[] = ["E-mail", "WhatsApp", "Ligação", "Tarefa"];
+  const channelTone: Record<CadenceChannel, string> = { "E-mail": "bg-[#E8F0FF] text-[#355E9A]", WhatsApp: "bg-[#E8F6F0] text-[#087E5A]", Ligação: "bg-[#FFF2DD] text-[#99631A]", Tarefa: "bg-[#EEEAE3] text-[#4E5752]" };
+  const slotLabel: Record<CadenceSlot, string> = { morning: "Manhã", afternoon: "Tarde" };
+  const blockAt = (day: number, slot: CadenceSlot) => blocks.find((block) => block.day === day && block.slot === slot);
+  const beginEdit = (block: CadenceBlock) => setDraft({ ...block });
+  const saveDraft = () => { if (draft?.title.trim()) { onEdit(draft); setDraft(null); } };
+
+  return <div className="min-h-screen bg-[#F6F5F1] px-4 pb-10 pt-7 md:px-8 md:pt-8">
+    <div className="mx-auto max-w-[1500px]">
+      <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+        <div><p className="eyebrow">Operação comercial</p><h1 className="font-display text-3xl font-extrabold tracking-[-0.06em] text-[#1B2522]">Cadência de prospecção</h1><p className="mt-1 max-w-xl text-sm font-medium text-[#77827C]">Desenhe a sequência de contatos por dia e turno. Arraste os blocos para reorganizar o ritmo.</p></div>
+        <div className="flex items-center gap-2"><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-bold text-[#087E5A]">{blocks.length} {blocks.length === 1 ? "ação" : "ações"} planejadas</span><Button onClick={() => onAdd(1, "morning")} className="h-9 rounded-xl bg-[#10A97A] px-3 text-xs font-extrabold hover:bg-[#087E5A]"><Plus size={15} /> Nova ação</Button></div>
+      </div>
+      <div className="overflow-hidden rounded-[24px] border border-[#E0E5DF] bg-[#FBFBF9] shadow-[0_18px_50px_rgba(27,37,34,0.06)]">
+        <div className="overflow-x-auto">
+          <div className="min-w-[1120px]">
+            <div className="grid grid-cols-[112px_repeat(10,minmax(100px,1fr))] border-b border-[#E3E6E0] bg-[#18201E] text-white">
+              <div className="flex items-center px-4 py-4 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#B9D7CA]">Turno</div>
+              {weekdays.map((weekday, index) => <div key={index} className="border-l border-white/10 px-3 py-3 text-center"><div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#B9D7CA]">Dia {String(index + 1).padStart(2, "0")}</div><div className="mt-1 text-xs font-bold capitalize">{weekday}</div></div>)}
+            </div>
+            {(["morning", "afternoon"] as CadenceSlot[]).map((slot) => <div key={slot} className="grid grid-cols-[112px_repeat(10,minmax(100px,1fr))] border-b border-[#E3E6E0] last:border-b-0"><div className="flex items-center bg-[#EFF4EF] px-4 text-xs font-extrabold uppercase tracking-[0.08em] text-[#315C4D]">{slotLabel[slot]}</div>{Array.from({ length: 10 }, (_, index) => { const day = index + 1; const block = blockAt(day, slot); return <div key={day} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { if (block) return; const id = event.dataTransfer?.getData("text/plain"); if (id) onMove(id, day, slot); }} className="min-h-[172px] border-l border-[#E3E6E0] bg-[#FCFCFA] p-2 transition-colors hover:bg-[#F3F8F4]">{block ? <div draggable onDragStart={(event) => { event.dataTransfer.setData("text/plain", block.id); }} onDoubleClick={() => beginEdit(block)} className="group relative flex h-full min-h-[150px] cursor-grab flex-col rounded-2xl border border-[#CFE6DA] bg-[#E8F6F0] p-3 shadow-[0_8px_18px_rgba(16,169,122,0.08)] active:cursor-grabbing"><div className="mb-3 flex items-start justify-between gap-2"><span className={`rounded-full px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.08em] ${channelTone[block.channel]}`}>{block.channel}</span><GripVertical size={15} className="text-[#86A99B]" /></div><p className="text-sm font-extrabold leading-tight text-[#1B2522]">{block.title}</p><p className="mt-2 line-clamp-3 text-[11px] font-medium leading-4 text-[#577066]">{block.notes || "Sem observações"}</p><div className="mt-auto flex items-center justify-between pt-3 text-[10px] font-bold text-[#087E5A]"><button onClick={(event) => { event.stopPropagation(); beginEdit(block); }} className="opacity-0 transition-opacity group-hover:opacity-100">Editar</button><button onClick={(event) => { event.stopPropagation(); onDelete(block.id); }} className="text-[#B04A43] opacity-0 transition-opacity group-hover:opacity-100">Excluir</button></div></div> : <button onClick={() => onAdd(day, slot)} className="flex h-full min-h-[150px] w-full flex-col items-center justify-center rounded-2xl border border-dashed border-[#D7DFD8] text-[#A0AAA4] transition hover:border-[#10A97A] hover:bg-[#F3F8F4] hover:text-[#087E5A]"><Plus size={18} /><span className="mt-2 text-[10px] font-bold">Adicionar ação</span></button>}</div>; })}</div>)}
+          </div>
+        </div>
+      </div>
+      <p className="mt-3 text-xs font-medium text-[#87928D]">Dica: arraste um bloco para uma célula vazia. Dê duplo clique ou use “Editar” para alterar canal, título e observações.</p>
+    </div>
+    <Dialog open={Boolean(draft)} onOpenChange={(open) => !open && setDraft(null)}><DialogContent className="max-w-[480px] border-[#E2E7E0] bg-[#FCFCFA]"><DialogHeader><DialogTitle className="font-display text-2xl tracking-[-0.04em]">Editar ação da cadência</DialogTitle><DialogDescription>Defina a mensagem e o canal desse ponto da sequência.</DialogDescription></DialogHeader>{draft && <div className="space-y-4"><div><Label>Título</Label><Input className="mt-1" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div><div><Label>Canal</Label><select className="form-select mt-1" value={draft.channel} onChange={(event) => setDraft({ ...draft, channel: event.target.value as CadenceChannel })}>{channels.map((channel) => <option key={channel}>{channel}</option>)}</select></div><div><Label>Observações</Label><textarea className="form-textarea mt-1 min-h-[110px]" value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setDraft(null)}>Cancelar</Button><Button onClick={saveDraft} className="bg-[#10A97A] hover:bg-[#087E5A]">Salvar ação</Button></div></div>}</DialogContent></Dialog>
   </div>;
 }
 
