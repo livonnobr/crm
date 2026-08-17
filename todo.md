@@ -67,6 +67,8 @@
 - [x] Validar a conexão direta do projeto ao Netlify e publicar a versão atual.
 - [x] Corrigir o campo de nome da lista para aceitar espaços e permitir valor vazio durante a edição.
 - [x] Republicar a correção no GitHub e no Netlify.
-- [ ] Adicionar exclusão de listas com confirmação e retenção de 30 dias na Lixeira.
-- [ ] Implementar restauração e exclusão definitiva de listas na Lixeira.
-- [ ] Publicar a melhoria da Lixeira no GitHub e no Netlify.
+- [x] Adicionar exclusão de listas com confirmação e retenção de 30 dias na Lixeira.
+- [x] Implementar restauração e exclusão definitiva de listas na Lixeira.
+- [x] Publicar a melhoria da Lixeira no GitHub e no Netlify.
+- [ ] Adicionar exportação da lista ativa em CSV e Excel (.xlsx).
+- [ ] Documentar que o salvamento atual é automático no navegador, sem sincronização entre dispositivos.

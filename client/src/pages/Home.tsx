@@ -17,6 +17,7 @@ import {
   CircleDollarSign,
   CirclePlus,
   ClipboardList,
+  Download,
   Clock3,
   Filter,
   GitBranch,
@@ -1367,6 +1368,36 @@ function ProspectingMetric({ label, value, detail, accent = false }: { label: st
   return <div className="rounded-2xl border border-[#DDE5DE] bg-[#FCFCFA] px-4 py-3 shadow-[0_8px_22px_rgba(43,61,53,0.04)]"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">{label}</span><span className={`h-1.5 w-1.5 rounded-full ${accent ? "bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.11)]" : "bg-[#A6B2AB]"}`} /></div><div className={`mt-2 font-display text-2xl font-extrabold tracking-[-0.05em] ${accent ? "text-[#087E5A]" : "text-[#27302D]"}`}>{value}</div><p className="mt-0.5 text-xs font-medium text-[#87938D]">{detail}</p></div>;
 }
 
+const PROSPECT_EXPORT_COLUMNS: Array<{ key: keyof Omit<ProspectRecord, "id">; label: string }> = [
+  { key: "decisionMakerFirstName", label: "Nome do decisor" },
+  { key: "decisionMakerLastName", label: "Sobrenome do decisor" },
+  { key: "decisionMakerEmail", label: "E-mail do decisor" },
+  { key: "decisionMakerPhone", label: "Telefone do decisor" },
+  { key: "company", label: "Empresa" },
+  { key: "companyWebsite", label: "Site da empresa" },
+  { key: "analysis", label: "Análise" },
+];
+
+function exportProspects(activeListName: string, prospects: ProspectRecord[], format: "csv" | "xls") {
+  const safeName = (activeListName.trim() || "lista-prospeccao").replace(/[^a-zA-Z0-9À-ÿ]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+  const rows = [PROSPECT_EXPORT_COLUMNS.map((column) => column.label), ...prospects.map((prospect) => PROSPECT_EXPORT_COLUMNS.map((column) => prospect[column.key] ?? ""))];
+  const escapeCsv = (value: string) => `"${String(value).replace(/"/g, '""')}"`;
+  const anchor = document.createElement("a");
+  if (format === "csv") {
+    const csv = "\uFEFF" + rows.map((row) => row.map(escapeCsv).join(";")) .join("\r\n");
+    anchor.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    anchor.download = `${safeName}.csv`;
+  } else {
+    const html = `<html><head><meta charset="utf-8" /></head><body><table><thead><tr>${rows[0].map((cell) => `<th>${String(cell).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</th>`).join("")}</tr></thead><tbody>${rows.slice(1).map((row) => `<tr>${row.map((cell) => `<td>${String(cell).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;
+    anchor.href = URL.createObjectURL(new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" }));
+    anchor.download = `${safeName}.xls`;
+  }
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
+}
+
 function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void }) {
   const [trashOpen, setTrashOpen] = useState(false);
   const columns: Array<{ key: keyof Omit<ProspectRecord, "id">; label: string; width: string; multiline?: boolean }> = [
@@ -1386,7 +1417,7 @@ function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListNam
     <div className="mx-auto max-w-[1600px]">
       <header className="flex flex-col gap-4 border-b border-[#E2E7E1] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div><p className="eyebrow">Prospecção comercial</p><div className="mt-1 flex items-center gap-2"><h1 className="page-title">Lista de Prospecção</h1><span className="h-2 w-2 rounded-full bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.12)]" /></div><p className="mt-2 text-sm text-[#728079]">Organize decisores, empresas e hipóteses de abordagem em uma única mesa de trabalho.</p></div>
-        <Button onClick={onAdd} className="h-10 gap-2 self-start rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A] sm:self-auto"><Plus size={18} />Nova linha</Button>
+        <div className="flex flex-wrap gap-2 self-start sm:self-auto"><Button onClick={onAdd} className="h-10 gap-2 rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A]"><Plus size={18} />Nova linha</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "csv")} className="h-10 gap-2 rounded-xl border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={15} />CSV</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "xls")} className="h-10 gap-2 rounded-xl border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={15} />Excel</Button></div>
       </header>
       <section className="mt-5 flex flex-col gap-3 rounded-2xl border border-[#DDE5DE] bg-[#FCFCFA] p-3 shadow-[0_8px_22px_rgba(43,61,53,0.04)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={18} /></div><div className="min-w-0"><label htmlFor="prospect-list-select" className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="mt-0.5 block max-w-[250px] truncate border-0 bg-transparent p-0 pr-8 font-display text-base font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select></div></div><div className="flex flex-wrap items-center gap-2"><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} className="h-9 w-[190px] rounded-lg border border-[#DDE5DE] bg-white px-3 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-9 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={15} />Nova lista</Button><Button variant="outline" onClick={onDeleteList} className="h-9 gap-1.5 rounded-lg border-[#F0D5D1] px-3 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={15} />Excluir</Button><Button variant="outline" onClick={() => setTrashOpen((open) => !open)} className="h-9 gap-1.5 rounded-lg border-[#DDE5DE] px-3 text-xs font-extrabold text-[#63706B] hover:bg-[#F3F5F1]"><Trash2 size={15} />Lixeira{trashedLists.length ? ` (${trashedLists.length})` : ""}</Button></div>
