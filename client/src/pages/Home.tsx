@@ -102,10 +102,10 @@ type FunnelRecord = { id: string; name: string; currency: string; position: numb
 type StageRecord = { id: string; funnel_id: string; name: string; color: string; probability: number; position: number };
 type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number };
 
-const logoUrl = "/manus-storage/ritmo-mark_6ae0770d.png";
-const heroUrl = "/manus-storage/ritmo-performance-hero_b5169baf.jpg";
-const goalsArtUrl = "/manus-storage/ritmo-goals-sculpture_afb88e12.jpg";
-const funnelArtUrl = "/manus-storage/ritmo-funnel-flow_c91b3f8a.jpg";
+const logoUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/XzvVLbbQIKNxqUWR.png";
+const heroUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/jujGClJPiwgthxhk.jpg";
+const goalsArtUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/RDXmzGzuzzJtGuhx.jpg";
+const funnelArtUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/RSAFUTacmmjjoCvV.jpg";
 
 const initialGoals: GoalItem[] = [
   {
