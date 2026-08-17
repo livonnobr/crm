@@ -1097,7 +1097,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="detail-dialog max-w-[1040px] gap-0 overflow-hidden border-[#DCE6DE] bg-[#FCFCFA] p-0 sm:rounded-3xl">
+      <DialogContent className="detail-dialog max-h-[calc(100vh-2rem)] max-w-[calc(100vw-1.5rem)] gap-0 overflow-hidden border-[#DCE6DE] bg-[#FCFCFA] p-0 sm:max-w-[calc(100vw-4rem)] sm:rounded-3xl xl:max-w-[1240px]">
         <div className="border-b border-[#E5EBE5] px-5 py-4 sm:px-7">
           <div className="flex flex-wrap items-start justify-between gap-4 pr-7">
             <div className="min-w-0"><div className="mb-2 flex items-center gap-2"><span className="tag-chip">{deal.tag}</span><span className="text-xs font-medium text-[#7A8881]">{deal.company}</span></div><DialogTitle className="font-display text-[24px] font-extrabold tracking-[-0.05em] text-[#1B2522] sm:text-[28px]">{deal.title}</DialogTitle><DialogDescription className="mt-1">Detalhe comercial, relacionamento e próximos movimentos em um só lugar.</DialogDescription></div>
@@ -1105,8 +1105,8 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
           </div>
         </div>
 
-        <div className="grid max-h-[72vh] overflow-y-auto lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.86fr)]">
-          <div className="space-y-6 border-b border-[#E5EBE5] p-5 sm:p-7 lg:border-b-0 lg:border-r">
+        <div className="grid max-h-[calc(100vh-10.5rem)] overflow-y-auto lg:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.95fr)]">
+          <div className="space-y-7 border-b border-[#E5EBE5] p-5 sm:p-7 lg:border-b-0 lg:border-r lg:p-8">
             <section>
               <div className="mb-3 flex items-center justify-between"><div><p className="eyebrow">Próxima ação</p><h3 className="font-display text-lg font-extrabold tracking-[-0.035em] text-[#27302D]">Atividades</h3></div><span className="rounded-full bg-[#E8F6F0] px-2.5 py-1 text-[10px] font-extrabold text-[#087E5A]">{openActivities.length} em aberto</span></div>
               <form onSubmit={submitActivity} className="activity-composer grid gap-2 rounded-2xl border border-[#DCE7DF] bg-[#F5F8F5] p-3 sm:grid-cols-[minmax(0,1fr)_170px_auto]">
@@ -1126,7 +1126,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
             </section>
           </div>
 
-          <aside className="space-y-6 bg-[#F8FAF8] p-5 sm:p-7">
+          <aside className="space-y-7 bg-[#F8FAF8] p-5 sm:p-7 lg:p-8">
             <section><div className="mb-3 flex items-center gap-2"><Users size={16} className="text-[#087E5A]" /><div><p className="eyebrow">Pessoa</p><h3 className="font-display text-base font-extrabold tracking-[-0.035em] text-[#27302D]">Contato principal</h3></div></div><div className="grid gap-3"><FormField label="Nome"><Input value={deal.contactName ?? ""} onChange={(event) => onUpdate({ contactName: event.target.value })} placeholder="Nome do contato" /></FormField><FormField label="Cargo"><Input value={deal.contactRole ?? ""} onChange={(event) => onUpdate({ contactRole: event.target.value })} placeholder="Ex.: Head de operações" /></FormField><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1"><FormField label="E-mail"><Input type="email" value={deal.contactEmail ?? ""} onChange={(event) => onUpdate({ contactEmail: event.target.value })} placeholder="contato@empresa.com" /></FormField><FormField label="Telefone"><Input value={deal.contactPhone ?? ""} onChange={(event) => onUpdate({ contactPhone: event.target.value })} placeholder="(11) 99999-9999" /></FormField></div></div></section>
             <section className="border-t border-[#E1E8E2] pt-6"><div className="mb-3 flex items-center gap-2"><Building2 size={16} className="text-[#087E5A]" /><div><p className="eyebrow">Organização</p><h3 className="font-display text-base font-extrabold tracking-[-0.035em] text-[#27302D]">Dados da empresa</h3></div></div><div className="grid gap-3"><FormField label="Empresa"><Input value={deal.company} onChange={(event) => onUpdate({ company: event.target.value })} placeholder="Nome da organização" /></FormField><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1"><FormField label="Segmento"><Input value={companyData.industry ?? ""} onChange={(event) => updateCompany("industry", event.target.value)} placeholder="Ex.: Tecnologia" /></FormField><FormField label="Porte"><Input value={companyData.size ?? ""} onChange={(event) => updateCompany("size", event.target.value)} placeholder="Ex.: 51–200" /></FormField></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1"><FormField label="Cidade"><Input value={companyData.city ?? ""} onChange={(event) => updateCompany("city", event.target.value)} placeholder="Ex.: São Paulo" /></FormField><FormField label="Site"><Input value={companyData.website ?? ""} onChange={(event) => updateCompany("website", event.target.value)} placeholder="empresa.com.br" /></FormField></div></div></section>
           </aside>

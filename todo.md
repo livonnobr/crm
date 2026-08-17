@@ -2,6 +2,7 @@
 
 - [ ] Conferir o deploy ativo do Netlify e republicar a versão correta, se necessário.
 - [x] Reduzir o espaço superior do funil e exibir zonas de decisão Ganho e Perdido durante o arraste.
+- [x] Ampliar o painel de detalhes da oportunidade para leitura e edição confortável em desktop.
 
 - [x] Implementar a barra lateral recolhível com expansão ao passar o mouse.
 - [x] Reduzir o cabeçalho do funil para priorizar o quadro de oportunidades.
