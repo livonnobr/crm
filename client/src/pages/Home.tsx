@@ -80,6 +80,7 @@ const PROSPECT_TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 type GoalType = "Prospecção" | "Vendas";
 type GoalUnit = "atividades" | "R$";
+type GoalCadence = "Diária" | "Semanal" | "Mensal";
 
 type GoalItem = {
   id: string;
@@ -89,6 +90,7 @@ type GoalItem = {
   actual: number;
   unit: GoalUnit;
   period: string;
+  cadence: GoalCadence;
   color: "emerald" | "blue" | "amber" | "violet";
 };
 
@@ -173,6 +175,7 @@ const initialGoals: GoalItem[] = [
     actual: 51,
     unit: "atividades",
     period: "Agosto 2026",
+    cadence: "Mensal",
     color: "emerald",
   },
   {
@@ -183,6 +186,7 @@ const initialGoals: GoalItem[] = [
     actual: 74800,
     unit: "R$",
     period: "Agosto 2026",
+    cadence: "Mensal",
     color: "blue",
   },
   {
@@ -193,6 +197,7 @@ const initialGoals: GoalItem[] = [
     actual: 19,
     unit: "atividades",
     period: "Agosto 2026",
+    cadence: "Mensal",
     color: "amber",
   },
 ];
@@ -284,6 +289,7 @@ const blankGoal: GoalItem = {
   actual: 0,
   unit: "atividades",
   period: "Agosto 2026",
+  cadence: "Mensal",
   color: "emerald",
 };
 
@@ -352,6 +358,24 @@ function formatCurrency(value: number) {
 
 function formatGoalValue(value: number, unit: GoalUnit) {
   return unit === "R$" ? formatCurrency(value) : new Intl.NumberFormat("pt-BR").format(value);
+}
+
+function parseGoalCadence(period: string): GoalCadence {
+  const match = period.match(/^(Diária|Semanal|Mensal)\s*[·|-]\s*/i);
+  return (match?.[1] as GoalCadence | undefined) ?? "Mensal";
+}
+
+function cleanGoalPeriod(period: string) {
+  return period.replace(/^(Diária|Semanal|Mensal)\s*[·|-]\s*/i, "").trim();
+}
+
+function goalPeriodValue(goal: GoalItem) {
+  return `${goal.cadence ?? parseGoalCadence(goal.period)} · ${cleanGoalPeriod(goal.period)}`;
+}
+
+function daysUntilMonthEnd(date = new Date()) {
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return Math.max(0, lastDay.getDate() - date.getDate());
 }
 
 function progressOf(goal: GoalItem) {
@@ -475,7 +499,8 @@ export default function Home() {
       target: Number(goal.target),
       actual: Number(goal.actual),
       unit: goal.unit,
-      period: goal.period,
+      period: cleanGoalPeriod(goal.period),
+      cadence: parseGoalCadence(goal.period),
       color: goal.color,
     }));
     const normalizedStages = (stageRows ?? []) as StageRecord[];
@@ -572,7 +597,7 @@ export default function Home() {
     const client = getSupabaseClient();
     const stageToFunnel = new Map(funnels.flatMap((funnel) => funnel.stages.map((stage) => [stage.id, funnel.id] as const)));
     const syncCloudState = async () => {
-      if (goals.length) await client.from("goals").upsert(goals.map((goal) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goal.period, color: goal.color })));
+      if (goals.length) await client.from("goals").upsert(goals.map((goal) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color })));
       if (funnels.length) await client.from("funnels").upsert(funnels.map((funnel, position) => ({ id: funnel.id, workspace_id: workspaceId, name: funnel.name, currency: funnel.currency, position })));
       const stageRows = funnels.flatMap((funnel) => funnel.stages.map((stage, position) => ({ id: stage.id, funnel_id: funnel.id, name: stage.name, color: stage.color, probability: stage.probability, position })));
       if (stageRows.length) await client.from("stages").upsert(stageRows);
@@ -1167,7 +1192,7 @@ export default function Home() {
               <FormField label="Objetivo"><Input min="1" type="number" value={goalDraft.target || ""} onChange={(event) => setGoalDraft({ ...goalDraft, target: Number(event.target.value) })} placeholder="0" /></FormField>
               <FormField label="Realizado até agora"><Input min="0" type="number" value={goalDraft.actual || ""} onChange={(event) => setGoalDraft({ ...goalDraft, actual: Number(event.target.value) })} placeholder="0" /></FormField>
             </div>
-            <FormField label="Período"><Input value={goalDraft.period} onChange={(event) => setGoalDraft({ ...goalDraft, period: event.target.value })} placeholder="Agosto 2026" /></FormField>
+            <div className="grid grid-cols-2 gap-4"><FormField label="Periodicidade"><select className="form-select" value={goalDraft.cadence} onChange={(event) => setGoalDraft({ ...goalDraft, cadence: event.target.value as GoalCadence })}><option>Diária</option><option>Semanal</option><option>Mensal</option></select></FormField><FormField label="Período"><Input value={goalDraft.period} onChange={(event) => setGoalDraft({ ...goalDraft, period: event.target.value })} placeholder="Agosto 2026" /></FormField></div>
             <div className="flex items-center justify-between border-t border-[#E8ECE6] pt-5">
               {goalDraft.id ? <button type="button" onClick={() => deleteGoal(goalDraft.id)} className="inline-flex items-center gap-2 text-sm font-bold text-[#B04A43]"><Trash2 size={16} />Excluir</button> : <span />}
               <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setGoalDialogOpen(false)}>Cancelar</Button><Button type="submit" className="bg-[#10A97A] hover:bg-[#087E5A]">Salvar meta</Button></div>
@@ -1318,6 +1343,8 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
 }
 
 function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal, onEditGoal, onDeleteGoal }: { goals: GoalItem[]; achievedRevenue: number; averageGoalProgress: number; onNewGoal: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void }) {
+  const daysRemaining = daysUntilMonthEnd();
+  const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date());
   return (
     <div className="pt-[68px] md:pt-0">
       <header className="flex min-h-[116px] items-center justify-between px-5 py-6 md:px-10">
@@ -1333,6 +1360,7 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
             return <div key={goal.id} className="instrument-cell"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="pulse-dot" /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#6F7D76]">{goal.type}</span></div><span className="text-xs font-extrabold text-[#087E5A]">{progress}%</span></div><p className="mt-3 truncate text-xs font-bold text-[#6C7A73]">{goal.title}</p><p className="mt-0.5 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#1B2522]">{formatGoalValue(goal.actual, goal.unit)}<span className="ml-1 text-sm font-bold text-[#85918B]">/ {formatGoalValue(goal.target, goal.unit)}</span></p><p className="mt-2 text-[11px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, goal.unit)}</p>{index < 2 && <span className="instrument-divider" />}</div>;
           })}
           {goals.length === 0 && <button onClick={onNewGoal} className="flex items-center gap-2 text-sm font-bold text-[#087E5A]"><CirclePlus size={18} />Criar primeiro instrumento</button>}
+          <div className="instrument-cell"><div className="flex items-center gap-2"><span className="pulse-dot bg-[#D8952E]" /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#6F7D76]">Fechamento do mês</span></div><p className="mt-3 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#1B2522]">{daysRemaining} {daysRemaining === 1 ? "dia" : "dias"}</p><p className="mt-1 text-[11px] font-medium capitalize text-[#85918B]">restantes em {currentMonth}</p></div>
         </section>
         <section className="hero-panel mt-5 overflow-hidden">
           <img src={heroUrl} alt="Caminho abstrato em ascensão representando avanço comercial" className="absolute inset-0 h-full w-full object-cover opacity-75" />
@@ -1364,7 +1392,7 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
 function GoalRow({ goal, onEdit, onDelete }: { goal: GoalItem; onEdit: () => void; onDelete: () => void }) {
   const progress = progressOf(goal);
   const styles = { emerald: "bg-[#10A97A]", blue: "bg-[#4386B6]", amber: "bg-[#D8952E]", violet: "bg-[#9075B5]" };
-  return <div className="group grid gap-4 rounded-2xl border border-[#E7EBE6] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8D0] hover:shadow-[0_12px_28px_rgba(30,55,44,0.05)] sm:grid-cols-[auto_minmax(190px,1fr)_minmax(175px,0.6fr)_auto] sm:items-center"><div className="goal-meter" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div><div className="mb-1 flex flex-wrap items-center gap-2"><span className="tag-chip">{goal.type}</span><span className="text-xs text-[#88938E]">{goal.period}</span></div><h3 className="font-display text-base font-bold tracking-[-0.025em] text-[#27302D]">{goal.title}</h3></div><div><div className="mb-2 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#35403B]">{formatGoalValue(goal.actual, goal.unit)}</span><span className="text-xs font-medium text-[#7D8983]">de {formatGoalValue(goal.target, goal.unit)}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className={`h-full rounded-full ${styles[goal.color]}`} style={{ width: `${progress}%` }} /></div></div><div className="flex justify-end gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100"><button onClick={onEdit} className="icon-button" aria-label={`Editar ${goal.title}`}><Pencil size={15} /></button><button onClick={onDelete} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${goal.title}`}><Trash2 size={15} /></button></div></div>;
+  return <div className="group grid gap-4 rounded-2xl border border-[#E7EBE6] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8D0] hover:shadow-[0_12px_28px_rgba(30,55,44,0.05)] sm:grid-cols-[auto_minmax(190px,1fr)_minmax(175px,0.6fr)_auto] sm:items-center"><div className="goal-meter" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div><div className="mb-1 flex flex-wrap items-center gap-2"><span className="tag-chip">{goal.type}</span><span className="rounded-full bg-[#F0F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#63736B]">{goal.cadence}</span><span className="text-xs text-[#88938E]">{cleanGoalPeriod(goal.period)}</span></div><h3 className="font-display text-base font-bold tracking-[-0.025em] text-[#27302D]">{goal.title}</h3></div><div><div className="mb-2 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#35403B]">{formatGoalValue(goal.actual, goal.unit)}</span><span className="text-xs font-medium text-[#7D8983]">de {formatGoalValue(goal.target, goal.unit)}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className={`h-full rounded-full ${styles[goal.color]}`} style={{ width: `${progress}%` }} /></div></div><div className="flex justify-end gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100"><button onClick={onEdit} className="icon-button" aria-label={`Editar ${goal.title}`}><Pencil size={15} /></button><button onClick={onDelete} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${goal.title}`}><Trash2 size={15} /></button></div></div>;
 }
 
 function ProspectingMetric({ label, value, detail, accent = false }: { label: string; value: string; detail: string; accent?: boolean }) {

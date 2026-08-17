@@ -81,5 +81,5 @@
 - [x] Validar e republicar o novo padrão de nomes.
 - [x] Remover os indicadores de contatos, canais e análises da Lista de Prospecção.
 - [x] Exibir apenas o contador de empresas preenchidas e republicar.
-- [ ] Compactar título, lista ativa e ações da Lista de Prospecção em uma linha.
-- [ ] Validar responsividade e republicar o cabeçalho compacto.
+- [x] Compactar título, lista ativa e ações da Lista de Prospecção em uma linha.
+- [x] Validar responsividade e republicar o cabeçalho compacto.
