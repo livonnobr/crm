@@ -1,7 +1,7 @@
 # Publicação externa do Ritmo CRM
 
-- [ ] Conferir o deploy ativo do Netlify e republicar a versão correta, se necessário.
-- [ ] Sincronizar a versão atual no GitHub e publicar a mesma compilação no Netlify.
+- [x] Conferir o deploy ativo do Netlify e republicar a versão correta, se necessário.
+- [x] Sincronizar a versão atual no GitHub e publicar a mesma compilação no Netlify.
 - [x] Reduzir o espaço superior do funil e exibir zonas de decisão Ganho e Perdido durante o arraste.
 - [x] Ampliar o painel de detalhes da oportunidade para leitura e edição confortável em desktop.
 - [x] Unificar os controles e indicadores do cabeçalho do funil em uma única linha no desktop.
