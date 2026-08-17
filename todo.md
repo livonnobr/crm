@@ -93,3 +93,8 @@
 - [x] Criar cadastro editável de taxas de conversão para cada etapa do funil.
 - [x] Adicionar simulador de leads com projeção automática das etapas seguintes.
 - [x] Validar e publicar o simulador de metas, incluindo persistência local e Supabase.
+- [x] Criar tabelas Supabase para listas, registros e lixeira de prospecção.
+- [x] Hidratar Lista de Prospecção e lixeira a partir do Supabase após autenticação.
+- [x] Espelhar automaticamente edições, novas linhas, exclusões e restaurações da Lista no Supabase.
+- [x] Espelhar automaticamente inclusões, edições, exclusões de funis, etapas e oportunidades no Supabase.
+- [ ] Publicar a persistência completa da Lista e do Funil no GitHub e no Netlify.

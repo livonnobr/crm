@@ -165,6 +165,8 @@ type GoalRecord = {
 };
 
 type ConversionSettingsRecord = { workspace_id: string; rates: ConversionRates };
+type ProspectListRow = { id: string; workspace_id: string; name: string; deleted_at: string | null };
+type ProspectRecordRow = { id: string; list_id: string; decision_maker_first_name: string; decision_maker_last_name: string; decision_maker_email: string; decision_maker_phone: string; company: string; company_website: string; analysis: string; position: number };
 type FunnelRecord = { id: string; name: string; currency: string; position: number };
 type StageRecord = { id: string; funnel_id: string; name: string; color: string; probability: number; position: number };
 type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null;   notes?: DealNote[] | null; stage_history?: string[] | null };
@@ -494,13 +496,15 @@ export default function Home() {
       currentWorkspaceId = createdWorkspace.id as string;
     }
 
-    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }] = await Promise.all([
+    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }] = await Promise.all([
       client.from("goals").select("id, title, goal_type, target, actual, unit, period, color").eq("workspace_id", currentWorkspaceId).order("created_at", { ascending: false }),
       client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
       client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
+      client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
+      client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_email, decision_maker_phone, company, company_website, analysis, position").order("position"),
     ]);
 
-    if (goalsError || funnelsError || conversionSettingsError) {
+    if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError) {
       toast.error("Não foi possível carregar os dados salvos.");
       setIsCloudLoading(false);
       setIsCloudHydrating(false);
@@ -522,6 +526,17 @@ export default function Home() {
       setIsCloudHydrating(false);
       return;
     }
+
+    const prospectRecordsByList = new Map<string, ProspectRecord[]>();
+    ((prospectRecordRows ?? []) as ProspectRecordRow[]).forEach((record) => {
+      const current = prospectRecordsByList.get(record.list_id) ?? [];
+      current.push({ id: record.id, decisionMakerFirstName: record.decision_maker_first_name, decisionMakerLastName: record.decision_maker_last_name, decisionMakerEmail: record.decision_maker_email, decisionMakerPhone: record.decision_maker_phone, company: record.company, companyWebsite: record.company_website, analysis: record.analysis });
+      prospectRecordsByList.set(record.list_id, current);
+    });
+    const cloudProspectLists = ((prospectListRows ?? []) as ProspectListRow[]).map((list) => ({ id: list.id, name: list.name, records: prospectRecordsByList.get(list.id) ?? [], deletedAt: list.deleted_at ?? undefined }));
+    const hasCloudProspectData = cloudProspectLists.length > 0;
+    const normalizedProspectLists = (hasCloudProspectData ? cloudProspectLists.filter((list) => !list.deletedAt) : prospectLists).map(({ deletedAt: _deletedAt, ...list }) => list);
+    const normalizedProspectTrash = hasCloudProspectData ? cloudProspectLists.filter((list): list is TrashedProspectList => Boolean(list.deletedAt && new Date(list.deletedAt).getTime() > Date.now() - PROSPECT_TRASH_RETENTION_MS)) : trashedProspectLists;
 
     const normalizedGoals = ((goalRows ?? []) as GoalRecord[]).map((goal) => ({
       id: goal.id,
@@ -566,6 +581,9 @@ export default function Home() {
     setFunnels(normalizedFunnels);
     setConversionRates({ ...defaultConversionRates(normalizedFunnels), ...((conversionSettingsRow as ConversionSettingsRecord | null)?.rates ?? {}) });
     setDeals(normalizedDeals);
+    setProspectLists(normalizedProspectLists.length ? normalizedProspectLists : initialProspectLists);
+    setTrashedProspectLists(normalizedProspectTrash);
+    setActiveProspectListId(normalizedProspectLists[0]?.id ?? initialProspectLists[0].id);
     setActiveFunnelId(normalizedFunnels[0]?.id ?? "");
     setWorkspaceId(currentWorkspaceId);
     setIsCloudLoading(false);
@@ -638,14 +656,51 @@ export default function Home() {
     const syncCloudState = async () => {
       if (goals.length) await client.from("goals").upsert(goals.map((goal) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color })));
       await client.from("conversion_settings").upsert({ workspace_id: workspaceId, rates: conversionRates, updated_at: new Date().toISOString() });
+      const funnelIds = funnels.map((funnel) => funnel.id);
+      const { data: remoteFunnels } = await client.from("funnels").select("id").eq("workspace_id", workspaceId);
+      const staleFunnelIds = ((remoteFunnels ?? []) as Array<{ id: string }>).map((funnel) => funnel.id).filter((id) => !funnelIds.includes(id));
+      if (staleFunnelIds.length) {
+        await client.from("opportunities").delete().in("funnel_id", staleFunnelIds);
+        await client.from("stages").delete().in("funnel_id", staleFunnelIds);
+        await client.from("funnels").delete().in("id", staleFunnelIds);
+      }
       if (funnels.length) await client.from("funnels").upsert(funnels.map((funnel, position) => ({ id: funnel.id, workspace_id: workspaceId, name: funnel.name, currency: funnel.currency, position })));
       const stageRows = funnels.flatMap((funnel) => funnel.stages.map((stage, position) => ({ id: stage.id, funnel_id: funnel.id, name: stage.name, color: stage.color, probability: stage.probability, position })));
+      if (funnelIds.length) {
+        const { data: remoteStages } = await client.from("stages").select("id, funnel_id").in("funnel_id", funnelIds);
+        const stageIds = stageRows.map((stage) => stage.id);
+        const staleStageIds = ((remoteStages ?? []) as Array<{ id: string; funnel_id: string }>).map((stage) => stage.id).filter((id) => !stageIds.includes(id));
+        if (staleStageIds.length) await client.from("stages").delete().in("id", staleStageIds);
+      }
       if (stageRows.length) await client.from("stages").upsert(stageRows);
       const opportunityRows = deals.flatMap((deal, position) => {
         const funnelId = stageToFunnel.get(deal.stageId);
         return funnelId ? [{ id: deal.id, funnel_id: funnelId, stage_id: deal.stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? null, contact_role: deal.contactRole ?? null, contact_email: deal.contactEmail ?? null, contact_phone: deal.contactPhone ?? null, company_data: { ...(deal.companyData ?? {}), __ritmoStageHistory: deal.stageHistory ?? [deal.stageId] }, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : [];
       });
+      if (funnelIds.length) {
+        const { data: remoteOpportunities } = await client.from("opportunities").select("id, funnel_id").in("funnel_id", funnelIds);
+        const opportunityIds = opportunityRows.map((deal) => deal.id);
+        const staleOpportunityIds = ((remoteOpportunities ?? []) as Array<{ id: string; funnel_id: string }>).map((deal) => deal.id).filter((id) => !opportunityIds.includes(id));
+        if (staleOpportunityIds.length) await client.from("opportunities").delete().in("id", staleOpportunityIds);
+      }
       if (opportunityRows.length) await client.from("opportunities").upsert(opportunityRows);
+
+      const desiredProspectLists = [...prospectLists, ...trashedProspectLists];
+      const desiredListIds = desiredProspectLists.map((list) => list.id);
+      const { data: existingProspectLists } = await client.from("prospect_lists").select("id").eq("workspace_id", workspaceId);
+      const staleListIds = ((existingProspectLists ?? []) as Array<{ id: string }>).map((list) => list.id).filter((id) => !desiredListIds.includes(id));
+      if (staleListIds.length) await client.from("prospect_lists").delete().in("id", staleListIds);
+      if (desiredProspectLists.length) {
+        await client.from("prospect_lists").upsert(desiredProspectLists.map((list) => ({ id: list.id, workspace_id: workspaceId, name: list.name, deleted_at: "deletedAt" in list ? list.deletedAt : null, updated_at: new Date().toISOString() })));
+      }
+      const prospectRecordRows = desiredProspectLists.flatMap((list) => list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
+      for (const list of desiredProspectLists) {
+        const { data: existingRecords } = await client.from("prospect_records").select("id").eq("list_id", list.id);
+        const desiredRecordIds = list.records.map((record) => record.id);
+        const staleRecordIds = ((existingRecords ?? []) as Array<{ id: string }>).map((record) => record.id).filter((id) => !desiredRecordIds.includes(id));
+        if (staleRecordIds.length) await client.from("prospect_records").delete().in("id", staleRecordIds);
+      }
+      if (prospectRecordRows.length) await client.from("prospect_records").upsert(prospectRecordRows);
     };
     void syncCloudState();
   }, [goals, funnels, deals, conversionRates, workspaceId, isCloudHydrating]);
