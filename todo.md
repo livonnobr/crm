@@ -98,3 +98,28 @@
 - [x] Espelhar automaticamente edições, novas linhas, exclusões e restaurações da Lista no Supabase.
 - [x] Espelhar automaticamente inclusões, edições, exclusões de funis, etapas e oportunidades no Supabase.
 - [ ] Publicar a persistência completa da Lista e do Funil no GitHub e no Netlify.
+
+## Integração Google Agenda e Meet
+
+- [ ] Auditar o modelo atual de atividades, negócios e conectores Google.
+- [ ] Configurar a integração Google Agenda com permissões de calendário e Meet.
+- [ ] Sincronizar atividades do CRM com eventos do Google Agenda.
+- [ ] Criar reuniões com Google Meet e associar o evento ao card do negócio.
+- [ ] Persistir IDs, links e estado de sincronização no Supabase.
+- [ ] Validar e publicar a integração no GitHub e no Netlify.
+
+## Integração completa Google Agenda + Meet
+
+- [ ] Fazer upgrade do projeto para full-stack com backend seguro.
+- [ ] Adicionar OAuth do Google e secrets privados de Calendar/Meet.
+- [ ] Criar esquema Supabase para tokens, eventos e vínculos com negócios.
+- [ ] Implementar endpoints de criação, atualização e sincronização de eventos.
+- [ ] Criar Google Meet ao gerar atividades do tipo reunião.
+- [ ] Exibir e atualizar o link do Meet no card do negócio.
+- [ ] Validar a integração com uma conta Google real e publicar no GitHub/Netlify.
+
+- [ ] Integração Google Agenda + Meet: adiada para o fim do backlog conforme prioridade definida pelo usuário.
+
+- [ ] Identificar e executar a próxima solicitação pendente do backlog antes da integração Google Agenda/Meet.
+
+- [x] Renomear visualmente Lista de Prospecção para Empresas e validar o cabeçalho compacto.
