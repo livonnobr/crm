@@ -27,6 +27,7 @@ import {
   Pencil,
   Pin,
   Plus,
+  RotateCcw,
   Search,
   Settings,
   SlidersHorizontal,
@@ -69,7 +70,12 @@ type ProspectList = {
   id: string;
   name: string;
   records: ProspectRecord[];
+  deletedAt?: string;
 };
+
+type TrashedProspectList = ProspectList & { deletedAt: string };
+
+const PROSPECT_TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 type GoalType = "Prospecção" | "Vendas";
 type GoalUnit = "atividades" | "R$";
@@ -286,9 +292,15 @@ const initialProspectLists: ProspectList[] = [{ id: "prospect-list-default", nam
 
 function storedProspectLists() {
   const savedLists = storedValue<ProspectList[] | null>("ritmo-prospect-lists", null);
-  if (Array.isArray(savedLists) && savedLists.length) return savedLists;
+  if (Array.isArray(savedLists) && savedLists.length) return savedLists.filter((list) => !list.deletedAt);
   const legacyRecords = storedValue<ProspectRecord[]>("ritmo-prospects", initialProspects);
   return [{ id: "prospect-list-default", name: "Lista principal", records: legacyRecords }];
+}
+
+function storedTrashedProspectLists() {
+  const savedLists = storedValue<TrashedProspectList[]>("ritmo-prospect-trash", []);
+  const cutoff = Date.now() - PROSPECT_TRASH_RETENTION_MS;
+  return savedLists.filter((list) => new Date(list.deletedAt).getTime() > cutoff);
 }
 
 const blankProspect: ProspectRecord = {
@@ -370,6 +382,7 @@ export default function Home() {
   const [funnels, setFunnels] = useState<SalesFunnel[]>(() => storedValue("ritmo-funnels", initialFunnels));
   const [deals, setDeals] = useState<Deal[]>(() => storedValue("ritmo-deals", initialDeals));
   const [prospectLists, setProspectLists] = useState<ProspectList[]>(() => storedProspectLists());
+  const [trashedProspectLists, setTrashedProspectLists] = useState<TrashedProspectList[]>(() => storedTrashedProspectLists());
   const [activeProspectListId, setActiveProspectListId] = useState(() => storedValue("ritmo-active-prospect-list", "prospect-list-default"));
   const [activeFunnelId, setActiveFunnelId] = useState(() => storedValue("ritmo-active-funnel", "primary-funnel"));
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
@@ -548,9 +561,10 @@ export default function Home() {
   useEffect(() => {
     if (!workspaceId) {
       window.localStorage.setItem("ritmo-prospect-lists", JSON.stringify(prospectLists));
+      window.localStorage.setItem("ritmo-prospect-trash", JSON.stringify(trashedProspectLists));
       window.localStorage.setItem("ritmo-active-prospect-list", activeProspectListId);
     }
-  }, [prospectLists, activeProspectListId, workspaceId]);
+  }, [prospectLists, trashedProspectLists, activeProspectListId, workspaceId]);
 
   useEffect(() => {
     if (!workspaceId || !supabase || isCloudHydrating) return;
@@ -628,6 +642,37 @@ export default function Home() {
     if (!activeProspectList) return;
     // Preserve the raw input while typing: spaces and an intentionally empty name are valid edit states.
     setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, name } : list));
+  }
+
+  function deleteProspectList() {
+    if (!activeProspectList) return;
+    const confirmed = window.confirm(`Mover a lista "${activeProspectList.name || "sem nome"}" para a Lixeira? Ela poderá ser restaurada por 30 dias.`);
+    if (!confirmed) return;
+    const deletedList: TrashedProspectList = { ...activeProspectList, deletedAt: new Date().toISOString() };
+    const remainingLists = prospectLists.filter((list) => list.id !== activeProspectList.id);
+    const nextLists = remainingLists.length ? remainingLists : [{ id: uniqueId("prospect-list"), name: "Lista principal", records: [] }];
+    setProspectLists(nextLists);
+    setTrashedProspectLists((current) => [deletedList, ...current.filter((list) => list.id !== deletedList.id)]);
+    setActiveProspectListId(nextLists[0].id);
+    toast.success("Lista movida para a Lixeira por 30 dias.");
+  }
+
+  function restoreProspectList(id: string) {
+    const trashedList = trashedProspectLists.find((list) => list.id === id);
+    if (!trashedList) return;
+    const { deletedAt: _deletedAt, ...restoredList } = trashedList;
+    setProspectLists((current) => [...current, restoredList]);
+    setTrashedProspectLists((current) => current.filter((list) => list.id !== id));
+    setActiveProspectListId(restoredList.id);
+    toast.success("Lista restaurada.");
+  }
+
+  function permanentlyDeleteProspectList(id: string) {
+    const trashedList = trashedProspectLists.find((list) => list.id === id);
+    if (!trashedList) return;
+    if (!window.confirm(`Excluir definitivamente a lista "${trashedList.name || "sem nome"}"? Esta ação não pode ser desfeita.`)) return;
+    setTrashedProspectLists((current) => current.filter((list) => list.id !== id));
+    toast.success("Lista excluída definitivamente.");
   }
 
   function selectProspectList(id: string) {
@@ -1088,7 +1133,7 @@ export default function Home() {
         ) : page === "activities" ? (
           <ActivitiesWorkspace deals={openDeals} onToggleActivity={toggleWorkspaceActivity} onOpenDeal={openDealDetail} onNewDeal={openNewDeal} />
         ) : (
-          <ProspectingWorkspace lists={prospectLists} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} />
+          <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} />
         )}
       </main>
 
@@ -1322,7 +1367,8 @@ function ProspectingMetric({ label, value, detail, accent = false }: { label: st
   return <div className="rounded-2xl border border-[#DDE5DE] bg-[#FCFCFA] px-4 py-3 shadow-[0_8px_22px_rgba(43,61,53,0.04)]"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">{label}</span><span className={`h-1.5 w-1.5 rounded-full ${accent ? "bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.11)]" : "bg-[#A6B2AB]"}`} /></div><div className={`mt-2 font-display text-2xl font-extrabold tracking-[-0.05em] ${accent ? "text-[#087E5A]" : "text-[#27302D]"}`}>{value}</div><p className="mt-0.5 text-xs font-medium text-[#87938D]">{detail}</p></div>;
 }
 
-function ProspectingWorkspace({ lists, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onAdd, onUpdate, onDelete }: { lists: ProspectList[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void }) {
+function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void }) {
+  const [trashOpen, setTrashOpen] = useState(false);
   const columns: Array<{ key: keyof Omit<ProspectRecord, "id">; label: string; width: string; multiline?: boolean }> = [
     { key: "decisionMakerFirstName", label: "Nome do decisor", width: "min-w-[170px]" },
     { key: "decisionMakerLastName", label: "Sobrenome do decisor", width: "min-w-[190px]" },
@@ -1343,8 +1389,9 @@ function ProspectingWorkspace({ lists, activeListId, activeListName, prospects, 
         <Button onClick={onAdd} className="h-10 gap-2 self-start rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A] sm:self-auto"><Plus size={18} />Nova linha</Button>
       </header>
       <section className="mt-5 flex flex-col gap-3 rounded-2xl border border-[#DDE5DE] bg-[#FCFCFA] p-3 shadow-[0_8px_22px_rgba(43,61,53,0.04)] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={18} /></div><div className="min-w-0"><label htmlFor="prospect-list-select" className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="mt-0.5 block max-w-[250px] truncate border-0 bg-transparent p-0 pr-8 font-display text-base font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select></div></div><div className="flex flex-wrap items-center gap-2"><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} className="h-9 w-[190px] rounded-lg border border-[#DDE5DE] bg-white px-3 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-9 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={15} />Nova lista</Button></div>
+        <div className="flex min-w-0 items-center gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={18} /></div><div className="min-w-0"><label htmlFor="prospect-list-select" className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="mt-0.5 block max-w-[250px] truncate border-0 bg-transparent p-0 pr-8 font-display text-base font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select></div></div><div className="flex flex-wrap items-center gap-2"><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} className="h-9 w-[190px] rounded-lg border border-[#DDE5DE] bg-white px-3 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-9 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={15} />Nova lista</Button><Button variant="outline" onClick={onDeleteList} className="h-9 gap-1.5 rounded-lg border-[#F0D5D1] px-3 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={15} />Excluir</Button><Button variant="outline" onClick={() => setTrashOpen((open) => !open)} className="h-9 gap-1.5 rounded-lg border-[#DDE5DE] px-3 text-xs font-extrabold text-[#63706B] hover:bg-[#F3F5F1]"><Trash2 size={15} />Lixeira{trashedLists.length ? ` (${trashedLists.length})` : ""}</Button></div>
       </section>
+      {trashOpen && <section className="mt-3 rounded-2xl border border-[#E4DDD5] bg-[#FFFDF9] p-4 shadow-[0_8px_22px_rgba(75,61,43,0.04)]"><div className="flex flex-col gap-2 border-b border-[#EEE6DC] pb-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><p className="text-sm font-extrabold text-[#3B3934]">Lixeira</p><span className="h-1.5 w-1.5 rounded-full bg-[#D8952E]" /></div><p className="mt-1 text-xs text-[#8B8177]">Listas excluídas ficam disponíveis por 30 dias para restauração.</p></div><span className="rounded-full bg-[#FFF2D9] px-3 py-1.5 text-xs font-extrabold text-[#9A6819]">{trashedLists.length} {trashedLists.length === 1 ? "lista" : "listas"}</span></div>{trashedLists.length ? <div className="mt-3 space-y-2">{trashedLists.map((list) => { const daysLeft = Math.max(0, Math.ceil((new Date(list.deletedAt).getTime() + PROSPECT_TRASH_RETENTION_MS - Date.now()) / (24 * 60 * 60 * 1000))); return <div key={list.id} className="flex flex-col gap-3 rounded-xl border border-[#EEE6DC] bg-white p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate text-sm font-bold text-[#3B3934]">{list.name || "Lista sem nome"}</p><p className="mt-1 text-xs text-[#8B8177]">{list.records.length} {list.records.length === 1 ? "registro" : "registros"} · expira em {daysLeft} {daysLeft === 1 ? "dia" : "dias"}</p></div><div className="flex shrink-0 gap-2"><Button variant="outline" onClick={() => onRestoreList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5E] hover:bg-[#E8F6F0]"><RotateCcw size={14} />Restaurar</Button><Button variant="outline" onClick={() => onPermanentDeleteList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#F0D5D1] px-3 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={14} />Excluir definitivamente</Button></div></div>; })}</div> : <p className="mt-4 text-sm text-[#8B8177]">A Lixeira está vazia.</p>}</section>}
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <ProspectingMetric label="Contatos na bancada" value={prospects.length.toString()} detail="linhas de prospecção" />
         <ProspectingMetric label="Com canal de contato" value={contactableCount.toString()} detail="e-mail ou telefone preenchido" accent />

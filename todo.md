@@ -65,5 +65,8 @@
 - [x] Confirmar o novo upload da melhoria no Netlify; pacote preparado, painel indisponível durante a tentativa — substituído por deploy direto confirmado.
 - [x] Reexecutar o deploy da versão de múltiplas listas no Netlify pela conexão existente.
 - [x] Validar a conexão direta do projeto ao Netlify e publicar a versão atual.
-- [ ] Corrigir o campo de nome da lista para aceitar espaços e permitir valor vazio durante a edição.
-- [ ] Republicar a correção no GitHub e no Netlify.
+- [x] Corrigir o campo de nome da lista para aceitar espaços e permitir valor vazio durante a edição.
+- [x] Republicar a correção no GitHub e no Netlify.
+- [ ] Adicionar exclusão de listas com confirmação e retenção de 30 dias na Lixeira.
+- [ ] Implementar restauração e exclusão definitiva de listas na Lixeira.
+- [ ] Publicar a melhoria da Lixeira no GitHub e no Netlify.
