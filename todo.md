@@ -1,8 +1,19 @@
 # Publicação externa do Ritmo CRM
 
+- [x] Implementar a barra lateral recolhível com expansão ao passar o mouse.
+- [x] Reduzir o cabeçalho do funil para priorizar o quadro de oportunidades.
+- [x] Ampliar o cadastro de oportunidades com atividades, observações e dados de empresa.
+- [x] Mapear e priorizar os recursos do Pipedrive aplicáveis ao Ritmo CRM.
+- [x] Publicar a evolução de navegação e contexto comercial no Netlify (deploy `6a8350d2315c537372f9964f`).
+
+## Contexto comercial
+
+- [x] Estender a tabela `opportunities` no Supabase com atividades, notas, contato e dados estruturados de empresa.
+
 - [x] Remover a coluna de etapa `Ganho` do quadro de funil.
 - [x] Criar uma zona de soltura `Ganhar oportunidade` no rodapé do funil.
-- [ ] Publicar o ajuste na branch `ritmo-crm` e no Netlify.
+- [x] Publicar o ajuste no Netlify.
+- [ ] Sincronizar o ajuste na branch `ritmo-crm` do GitHub; o token temporário retornou erro 403 de permissão no repositório.
 
 - [x] Criar e identificar o projeto Supabase para a persistência do CRM.
 - [x] Migrar o modelo de metas, funis, etapas e oportunidades para o Supabase.

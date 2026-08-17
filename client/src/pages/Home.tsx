@@ -10,10 +10,13 @@ import {
   BriefcaseBusiness,
   Building2,
   Calendar,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Circle,
   CircleDollarSign,
   CirclePlus,
+  ClipboardList,
   Clock3,
   Filter,
   GitBranch,
@@ -22,6 +25,7 @@ import {
   Menu,
   MoreHorizontal,
   Pencil,
+  Pin,
   Plus,
   Search,
   Settings,
@@ -45,6 +49,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { getSupabaseClient, isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 type Page = "goals" | "pipeline";
@@ -76,6 +81,26 @@ type SalesFunnel = {
   stages: Stage[];
 };
 
+type DealActivity = {
+  id: string;
+  subject: string;
+  dueAt: string;
+  done: boolean;
+};
+
+type DealNote = {
+  id: string;
+  content: string;
+  createdAt: string;
+};
+
+type CompanyData = {
+  industry?: string;
+  size?: string;
+  website?: string;
+  city?: string;
+};
+
 type Deal = {
   id: string;
   title: string;
@@ -85,6 +110,13 @@ type Deal = {
   stageId: string;
   tag: string;
   nextActivity: string;
+  contactName?: string;
+  contactRole?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  companyData?: CompanyData;
+  activities?: DealActivity[];
+  notes?: DealNote[];
 };
 
 type GoalRecord = {
@@ -100,7 +132,7 @@ type GoalRecord = {
 
 type FunnelRecord = { id: string; name: string; currency: string; position: number };
 type StageRecord = { id: string; funnel_id: string; name: string; color: string; probability: number; position: number };
-type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number };
+type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null; notes?: DealNote[] | null };
 
 const logoUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/XzvVLbbQIKNxqUWR.png";
 const heroUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/jujGClJPiwgthxhk.jpg";
@@ -238,6 +270,13 @@ const blankDeal: Deal = {
   stageId: "",
   tag: "Inbound",
   nextActivity: "",
+  contactName: "",
+  contactRole: "",
+  contactEmail: "",
+  contactPhone: "",
+  companyData: {},
+  activities: [],
+  notes: [],
 };
 
 function storedValue<T>(key: string, fallback: T): T {
@@ -276,7 +315,8 @@ function isWonStage(stage: Stage) {
 
 export default function Home() {
   const [page, setPage] = useState<Page>(() => new URLSearchParams(window.location.search).get("aba") === "funil" ? "pipeline" : "goals");
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isSidebarPinned, setIsSidebarPinned] = useState(false);
+  const [isSidebarHovering, setIsSidebarHovering] = useState(false);
   const [goals, setGoals] = useState<GoalItem[]>(() => storedValue("ritmo-goals", initialGoals));
   const [funnels, setFunnels] = useState<SalesFunnel[]>(() => storedValue("ritmo-funnels", initialFunnels));
   const [deals, setDeals] = useState<Deal[]>(() => storedValue("ritmo-deals", initialDeals));
@@ -299,6 +339,7 @@ export default function Home() {
   const [stageDraft, setStageDraft] = useState<Stage>({ id: "", name: "", color: "#10A97A", probability: 20 });
   const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
   const [overStageId, setOverStageId] = useState<string | null>(null);
+  const [detailDealId, setDetailDealId] = useState<string | null>(null);
 
   async function loadCloudWorkspace(userId: string) {
     if (!supabase) return;
@@ -351,7 +392,7 @@ export default function Home() {
     const [{ data: stageRows, error: stagesError }, { data: opportunityRows, error: opportunitiesError }] = funnelIds.length
       ? await Promise.all([
           client.from("stages").select("id, funnel_id, name, color, probability, position").in("funnel_id", funnelIds).order("position"),
-          client.from("opportunities").select("id, funnel_id, stage_id, title, company, value, owner_initials, tag, next_activity, position").in("funnel_id", funnelIds).order("position"),
+          client.from("opportunities").select("id, funnel_id, stage_id, title, company, value, owner_initials, tag, next_activity, position, contact_name, contact_role, contact_email, contact_phone, company_data, activities, notes").in("funnel_id", funnelIds).order("position"),
         ])
       : [{ data: [], error: null }, { data: [], error: null }];
 
@@ -388,6 +429,13 @@ export default function Home() {
       stageId: deal.stage_id,
       tag: deal.tag,
       nextActivity: deal.next_activity,
+      contactName: deal.contact_name ?? "",
+      contactRole: deal.contact_role ?? "",
+      contactEmail: deal.contact_email ?? "",
+      contactPhone: deal.contact_phone ?? "",
+      companyData: deal.company_data ?? {},
+      activities: Array.isArray(deal.activities) ? deal.activities : [],
+      notes: Array.isArray(deal.notes) ? deal.notes : [],
     }));
 
     setGoals(normalizedGoals);
@@ -454,7 +502,7 @@ export default function Home() {
       if (stageRows.length) await client.from("stages").upsert(stageRows);
       const opportunityRows = deals.flatMap((deal, position) => {
         const funnelId = stageToFunnel.get(deal.stageId);
-        return funnelId ? [{ id: deal.id, funnel_id: funnelId, stage_id: deal.stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, position }] : [];
+        return funnelId ? [{ id: deal.id, funnel_id: funnelId, stage_id: deal.stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? null, contact_role: deal.contactRole ?? null, contact_email: deal.contactEmail ?? null, contact_phone: deal.contactPhone ?? null, company_data: deal.companyData ?? {}, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : [];
       });
       if (opportunityRows.length) await client.from("opportunities").upsert(opportunityRows);
     };
@@ -479,10 +527,10 @@ export default function Home() {
     .filter((goal) => goal.unit === "R$")
     .reduce((sum, goal) => sum + goal.actual, 0);
   const averageGoalProgress = goals.length ? Math.round(goals.reduce((sum, goal) => sum + progressOf(goal), 0) / goals.length) : 0;
+  const detailDeal = deals.find((deal) => deal.id === detailDealId);
 
   function selectPage(nextPage: Page) {
     setPage(nextPage);
-    setIsMobileNavOpen(false);
   }
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
@@ -566,6 +614,43 @@ export default function Home() {
   function openEditDeal(deal: Deal) {
     setDealDraft(deal);
     setDealDialogOpen(true);
+  }
+
+  function openDealDetail(deal: Deal) {
+    setDetailDealId(deal.id);
+  }
+
+  function updateDealContext(dealId: string, patch: Partial<Deal>) {
+    setDeals((current) => current.map((deal) => (deal.id === dealId ? { ...deal, ...patch } : deal)));
+  }
+
+  function addDealActivity(deal: Deal, subject: string, dueAt: string) {
+    const cleanSubject = subject.trim();
+    if (!cleanSubject) {
+      toast.error("Dê um título para a atividade.");
+      return false;
+    }
+    const activity: DealActivity = { id: uniqueId("activity"), subject: cleanSubject, dueAt, done: false };
+    updateDealContext(deal.id, { activities: [...(deal.activities ?? []), activity], nextActivity: dueAt || cleanSubject });
+    toast.success("Atividade programada.");
+    return true;
+  }
+
+  function toggleDealActivity(deal: Deal, activityId: string) {
+    const activities = (deal.activities ?? []).map((activity) => activity.id === activityId ? { ...activity, done: !activity.done } : activity);
+    const nextPending = activities.find((activity) => !activity.done);
+    updateDealContext(deal.id, { activities, nextActivity: nextPending ? (nextPending.dueAt || nextPending.subject) : "Sem pendências" });
+  }
+
+  function addDealNote(deal: Deal, content: string) {
+    const cleanContent = content.trim();
+    if (!cleanContent) {
+      toast.error("Escreva uma observação antes de salvar.");
+      return false;
+    }
+    updateDealContext(deal.id, { notes: [{ id: uniqueId("note"), content: cleanContent, createdAt: new Date().toISOString() }, ...(deal.notes ?? [])] });
+    toast.success("Observação adicionada.");
+    return true;
   }
 
   function saveDeal(event: FormEvent<HTMLFormElement>) {
@@ -741,68 +826,67 @@ export default function Home() {
 
   const sidebarContent = (
     <>
-      <div className="flex items-center gap-3 px-3 pb-8 pt-2">
-        <img className="h-10 w-10 rounded-xl object-cover shadow-[0_10px_22px_rgba(16,169,122,0.18)]" src={logoUrl} alt="Símbolo Ritmo" />
-        <div>
-          <div className="font-display text-[22px] font-extrabold leading-none tracking-[-0.06em] text-[#17201e]">ritmo</div>
-          <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A9792]">receita em foco</div>
+      <SidebarHeader className="px-2 pb-6 pt-2">
+        <div className="flex items-center gap-3 px-1">
+          <img className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-[0_10px_22px_rgba(16,169,122,0.18)]" src={logoUrl} alt="Símbolo Ritmo" />
+          <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+            <div className="font-display flex items-center gap-1 text-[22px] font-extrabold leading-none tracking-[-0.06em] text-[#17201e]">ritmo<span className="h-1.5 w-1.5 rounded-full bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.12)]" /></div>
+            <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A9792]">receita em foco</div>
+          </div>
+          <button type="button" onClick={() => setIsSidebarPinned((current) => !current)} className={`ml-auto grid h-8 w-8 place-items-center rounded-lg transition group-data-[collapsible=icon]:hidden ${isSidebarPinned ? "bg-[#E8F6F0] text-[#087E5A]" : "text-[#7B8882] hover:bg-[#F0F3EF]"}`} aria-label={isSidebarPinned ? "Desafixar barra lateral" : "Fixar barra lateral"}>
+            <Pin size={15} className={isSidebarPinned ? "fill-current" : ""} />
+          </button>
         </div>
-        <button className="ml-auto md:hidden" onClick={() => setIsMobileNavOpen(false)} aria-label="Fechar menu">
-          <X className="h-5 w-5 text-[#53615E]" />
-        </button>
-      </div>
+      </SidebarHeader>
 
-      <nav className="space-y-1" aria-label="Navegação principal">
-        <SidebarItem icon={<Target size={19} />} label="Metas" active={page === "goals"} onClick={() => selectPage("goals")} />
-        <SidebarItem icon={<GitBranch size={19} />} label="Funil de vendas" active={page === "pipeline"} onClick={() => selectPage("pipeline")} />
-        <SidebarItem icon={<Users size={19} />} label="Pessoas" onClick={() => toast.info("Pessoas entra na próxima etapa do CRM.")} />
-        <SidebarItem icon={<Calendar size={19} />} label="Atividades" onClick={() => toast.info("Atividades entra na próxima etapa do CRM.")} />
-      </nav>
+      <SidebarContent className="px-2">
+        <SidebarGroup className="p-0">
+          <SidebarMenu>
+            <SidebarItem icon={<Target size={19} />} label="Metas" active={page === "goals"} onClick={() => selectPage("goals")} />
+            <SidebarItem icon={<GitBranch size={19} />} label="Funil de vendas" active={page === "pipeline"} onClick={() => selectPage("pipeline")} />
+            <SidebarItem icon={<Users size={19} />} label="Pessoas" onClick={() => toast.info("Pessoas entra na próxima etapa do CRM.")} />
+            <SidebarItem icon={<Calendar size={19} />} label="Atividades" onClick={() => toast.info("Atividades entra na próxima etapa do CRM.")} />
+          </SidebarMenu>
+        </SidebarGroup>
 
-      <div className="mt-10 px-3">
-        <p className="px-3 pb-3 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#9AA59F]">Visões</p>
-        <button onClick={() => toast.info("Relatórios será conectado quando a base Supabase estiver ativa.")} className="sidebar-link w-full">
-          <Activity size={18} />
-          <span>Ritmo do mês</span>
-        </button>
-        <button onClick={() => toast.info("Configurações estará disponível em breve.")} className="sidebar-link w-full">
-          <Settings size={18} />
-          <span>Configurações</span>
-        </button>
-      </div>
+        <SidebarGroup className="mt-7 p-0">
+          <SidebarGroupLabel className="px-3 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#9AA59F] group-data-[collapsible=icon]:hidden">Visões</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarItem icon={<Activity size={18} />} label="Ritmo do mês" onClick={() => toast.info("Relatórios será conectado quando a base Supabase estiver ativa.")} />
+              <SidebarItem icon={<Settings size={18} />} label="Configurações" onClick={() => toast.info("Configurações estará disponível em breve.")} />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
 
-      <div className="mt-auto rounded-2xl bg-[#E8F6F0] p-4">
-        <div className="mb-3 flex items-center gap-2 text-[#087E5A]">
-          <Sparkles size={16} />
-          <span className="text-xs font-extrabold">Pulso comercial</span>
+      <SidebarFooter className="gap-3 px-2 pb-3">
+        <div className="rounded-2xl bg-[#E8F6F0] p-4 group-data-[collapsible=icon]:hidden">
+          <div className="mb-2 flex items-center gap-2 text-[#087E5A]"><Sparkles size={16} /><span className="text-xs font-extrabold">Pulso comercial</span></div>
+          <p className="text-xs font-medium leading-5 text-[#315C4D]">Sua cadência está <strong>18% à frente</strong> do planejado.</p>
+          <button onClick={() => setPage("goals")} className="mt-3 flex items-center gap-1 text-xs font-bold text-[#087E5A]">Ver metas <ArrowUpRight size={13} /></button>
         </div>
-        <p className="text-xs font-medium leading-5 text-[#315C4D]">Sua cadência está <strong>18% à frente</strong> do planejado.</p>
-        <button onClick={() => setPage("goals")} className="mt-3 flex items-center gap-1 text-xs font-bold text-[#087E5A]">
-          Ver metas <ArrowUpRight size={13} />
-        </button>
-      </div>
-
-      <button onClick={() => accountEmail ? void signOutOfCloud() : setAuthDialogOpen(true)} className="mt-5 flex w-full items-center gap-3 rounded-xl px-3 pt-4 text-left transition hover:bg-[#F0F3EF]">
-        <div className="grid h-9 w-9 place-items-center rounded-full bg-[#18201E] text-xs font-bold text-white">{accountEmail ? accountEmail.slice(0, 2).toUpperCase() : "AR"}</div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-[#27302D]">{accountEmail ? "Conta conectada" : isSupabaseConfigured ? "Conectar à nuvem" : "Modo local"}</p>
-          <p className="truncate text-xs text-[#87928D]">{accountEmail ?? (isCloudLoading ? "Carregando conexão..." : isSupabaseConfigured ? "Entrar com e-mail" : "Dados neste navegador")}</p>
-        </div>
-        <ChevronDown className="h-4 w-4 text-[#87928D]" />
-      </button>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip={accountEmail ? "Conta conectada" : isSupabaseConfigured ? "Conectar à nuvem" : "Modo local"} onClick={() => accountEmail ? void signOutOfCloud() : setAuthDialogOpen(true)} className="h-auto rounded-xl px-2 py-2 text-left hover:bg-[#F0F3EF]">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#18201E] text-[9px] font-bold text-white">{accountEmail ? accountEmail.slice(0, 2).toUpperCase() : "AR"}</span>
+              <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><span className="block truncate text-sm font-bold text-[#27302D]">{accountEmail ? "Conta conectada" : isSupabaseConfigured ? "Conectar à nuvem" : "Modo local"}</span><span className="block truncate text-xs text-[#87928D]">{accountEmail ?? (isCloudLoading ? "Carregando conexão..." : isSupabaseConfigured ? "Entrar com e-mail" : "Dados neste navegador")}</span></span>
+              <ChevronDown className="h-4 w-4 text-[#87928D] group-data-[collapsible=icon]:hidden" />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </>
   );
 
   return (
-    <div className="min-h-screen bg-[#F6F5F1] text-[#1B2522]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[250px] flex-col border-r border-[#E3E6E0] bg-[#FBFBF9] px-4 py-6 md:flex">
+    <SidebarProvider open={isSidebarPinned || isSidebarHovering} onOpenChange={setIsSidebarPinned} className="min-h-screen bg-[#F6F5F1] text-[#1B2522]">
+      <Sidebar collapsible="icon" className="border-r border-[#E3E6E0] bg-[#FBFBF9] px-2 py-5" onMouseEnter={() => setIsSidebarHovering(true)} onMouseLeave={() => setIsSidebarHovering(false)}>
         {sidebarContent}
-      </aside>
+      </Sidebar>
 
       <div className="fixed inset-x-0 top-0 z-20 flex h-[68px] items-center justify-between border-b border-[#E3E6E0] bg-[#FBFBF9]/95 px-4 backdrop-blur md:hidden">
-        <button onClick={() => setIsMobileNavOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-[#E3E6E0] bg-white" aria-label="Abrir menu">
-          <Menu className="h-5 w-5" />
-        </button>
+        <SidebarTrigger className="h-10 w-10 rounded-xl border border-[#E3E6E0] bg-white text-[#27302D] hover:bg-[#F0F3EF]" aria-label="Abrir menu" />
         <div className="flex items-center gap-2">
           <img className="h-8 w-8 rounded-lg" src={logoUrl} alt="" />
           <span className="font-display text-lg font-extrabold tracking-[-0.06em]">ritmo</span>
@@ -812,15 +896,7 @@ export default function Home() {
         </button>
       </div>
 
-      {isMobileNavOpen && (
-        <div className="fixed inset-0 z-40 bg-[#17201E]/30 backdrop-blur-sm md:hidden" onClick={() => setIsMobileNavOpen(false)}>
-          <aside className="flex h-full w-[280px] flex-col bg-[#FBFBF9] p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            {sidebarContent}
-          </aside>
-        </div>
-      )}
-
-      <main className="min-h-screen md:ml-[250px]">
+      <main className="min-h-screen min-w-0 flex-1">
         {page === "goals" ? (
           <GoalsWorkspace
             goals={goals}
@@ -846,7 +922,7 @@ export default function Home() {
             onNewFunnel={openNewFunnel}
             onEditFunnel={openEditFunnel}
             onNewDeal={openNewDeal}
-            onEditDeal={openEditDeal}
+            onEditDeal={openDealDetail}
             onNewStage={openNewStage}
             onEditStage={openEditStage}
             onDragStart={startDrag}
@@ -930,22 +1006,110 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
+      <DealDetailDialog
+        deal={detailDeal}
+        open={Boolean(detailDeal)}
+        onOpenChange={(open) => !open && setDetailDealId(null)}
+        onUpdate={(patch) => detailDeal && updateDealContext(detailDeal.id, patch)}
+        onAddActivity={(subject, dueAt) => detailDeal ? addDealActivity(detailDeal, subject, dueAt) : false}
+        onToggleActivity={(activityId) => detailDeal && toggleDealActivity(detailDeal, activityId)}
+        onAddNote={(content) => detailDeal ? addDealNote(detailDeal, content) : false}
+        onEditOpportunity={() => detailDeal && openEditDeal(detailDeal)}
+      />
+
       <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
         <DialogContent className="max-w-[460px] border-[#E2E7E0] bg-[#FCFCFA] p-0">
           <div className="border-b border-[#E8ECE6] px-6 py-5"><DialogHeader><DialogTitle className="font-display text-2xl tracking-[-0.04em]">Conectar ao Ritmo</DialogTitle><DialogDescription>Use seu e-mail para abrir um espaço comercial protegido e sincronizado no Supabase.</DialogDescription></DialogHeader></div>
           <form onSubmit={sendMagicLink} className="space-y-5 px-6 py-6"><FormField label="Seu e-mail"><Input type="email" autoFocus value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="voce@empresa.com" /></FormField><div className="flex justify-end gap-2 border-t border-[#E8ECE6] pt-5"><Button type="button" variant="outline" onClick={() => setAuthDialogOpen(false)}>Cancelar</Button><Button disabled={isAuthSending} type="submit" className="bg-[#10A97A] hover:bg-[#087E5A]">{isAuthSending ? "Enviando..." : "Enviar link de acesso"}</Button></div></form>
         </DialogContent>
       </Dialog>
-    </div>
+    </SidebarProvider>
   );
 }
 
 function SidebarItem({ icon, label, active = false, onClick }: { icon: React.ReactNode; label: string; active?: boolean; onClick: () => void }) {
-  return <button onClick={onClick} className={`sidebar-link w-full ${active ? "sidebar-link-active" : ""}`}>{icon}<span>{label}</span>{active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#10A97A]" />}</button>;
+  return <SidebarMenuItem><SidebarMenuButton tooltip={label} isActive={active} onClick={onClick} className={`sidebar-link h-11 w-full ${active ? "sidebar-link-active" : ""}`}>{icon}<span>{label}</span>{active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#10A97A] group-data-[collapsible=icon]:hidden" />}</SidebarMenuButton></SidebarMenuItem>;
 }
 
 function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-2"><Label className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#63706B]">{label}</Label>{children}</div>;
+}
+
+function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, onToggleActivity, onAddNote, onEditOpportunity }: { deal?: Deal; open: boolean; onOpenChange: (open: boolean) => void; onUpdate: (patch: Partial<Deal>) => void; onAddActivity: (subject: string, dueAt: string) => boolean | void; onToggleActivity: (activityId: string) => void; onAddNote: (content: string) => boolean | void; onEditOpportunity: () => void }) {
+  const [activitySubject, setActivitySubject] = useState("");
+  const [activityDueAt, setActivityDueAt] = useState("");
+  const [noteDraft, setNoteDraft] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setActivitySubject("");
+      setActivityDueAt("");
+      setNoteDraft("");
+    }
+  }, [deal?.id, open]);
+
+  if (!deal) return null;
+  const companyData = deal.companyData ?? {};
+  const activities = deal.activities ?? [];
+  const notes = deal.notes ?? [];
+  const openActivities = activities.filter((activity) => !activity.done);
+
+  function updateCompany(field: keyof CompanyData, value: string) {
+    onUpdate({ companyData: { ...companyData, [field]: value } });
+  }
+
+  function submitActivity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (onAddActivity(activitySubject, activityDueAt)) {
+      setActivitySubject("");
+      setActivityDueAt("");
+    }
+  }
+
+  function submitNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (onAddNote(noteDraft)) setNoteDraft("");
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="detail-dialog max-w-[1040px] gap-0 overflow-hidden border-[#DCE6DE] bg-[#FCFCFA] p-0 sm:rounded-3xl">
+        <div className="border-b border-[#E5EBE5] px-5 py-4 sm:px-7">
+          <div className="flex flex-wrap items-start justify-between gap-4 pr-7">
+            <div className="min-w-0"><div className="mb-2 flex items-center gap-2"><span className="tag-chip">{deal.tag}</span><span className="text-xs font-medium text-[#7A8881]">{deal.company}</span></div><DialogTitle className="font-display text-[24px] font-extrabold tracking-[-0.05em] text-[#1B2522] sm:text-[28px]">{deal.title}</DialogTitle><DialogDescription className="mt-1">Detalhe comercial, relacionamento e próximos movimentos em um só lugar.</DialogDescription></div>
+            <div className="flex items-center gap-2"><div className="hidden rounded-xl border border-[#DDE5DE] bg-white px-3 py-2 text-right sm:block"><p className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#7B8882]">Valor</p><p className="mt-0.5 text-sm font-extrabold text-[#1B2522]">{formatCurrency(deal.value)}</p></div><Button type="button" variant="outline" onClick={onEditOpportunity} className="h-10 gap-2 border-[#DCE5DE] bg-white text-[#44524C] hover:text-[#087E5A]"><Pencil size={15} />Editar</Button></div>
+          </div>
+        </div>
+
+        <div className="grid max-h-[72vh] overflow-y-auto lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.86fr)]">
+          <div className="space-y-6 border-b border-[#E5EBE5] p-5 sm:p-7 lg:border-b-0 lg:border-r">
+            <section>
+              <div className="mb-3 flex items-center justify-between"><div><p className="eyebrow">Próxima ação</p><h3 className="font-display text-lg font-extrabold tracking-[-0.035em] text-[#27302D]">Atividades</h3></div><span className="rounded-full bg-[#E8F6F0] px-2.5 py-1 text-[10px] font-extrabold text-[#087E5A]">{openActivities.length} em aberto</span></div>
+              <form onSubmit={submitActivity} className="activity-composer grid gap-2 rounded-2xl border border-[#DCE7DF] bg-[#F5F8F5] p-3 sm:grid-cols-[minmax(0,1fr)_170px_auto]">
+                <Input value={activitySubject} onChange={(event) => setActivitySubject(event.target.value)} placeholder="Ex.: Ligar para validar proposta" className="border-[#DCE7DF] bg-white" />
+                <Input type="datetime-local" value={activityDueAt} onChange={(event) => setActivityDueAt(event.target.value)} className="border-[#DCE7DF] bg-white" />
+                <Button type="submit" className="h-10 bg-[#10A97A] px-3 hover:bg-[#087E5A]"><Plus size={17} /></Button>
+              </form>
+              <div className="mt-3 space-y-2">
+                {activities.length ? activities.map((activity) => <button key={activity.id} type="button" onClick={() => onToggleActivity(activity.id)} className="flex w-full items-center gap-3 rounded-xl border border-[#E7ECE7] bg-white px-3 py-3 text-left transition hover:border-[#C8DCD0] hover:bg-[#FBFCF9]">{activity.done ? <CheckCircle2 size={18} className="shrink-0 text-[#10A97A]" /> : <Circle size={18} className="shrink-0 text-[#A0AEA6]" />}<span className="min-w-0 flex-1"><span className={`block truncate text-sm font-bold ${activity.done ? "text-[#8A9690] line-through" : "text-[#35403B]"}`}>{activity.subject}</span><span className="mt-0.5 block text-xs text-[#819088]">{activity.dueAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(activity.dueAt)) : "Sem horário definido"}</span></span></button>) : <div className="rounded-xl border border-dashed border-[#D4DED6] bg-[#FBFCF9] p-4 text-sm text-[#7B8982]">Nenhuma atividade cadastrada. Use a barra acima para registrar o próximo passo.</div>}
+              </div>
+            </section>
+
+            <section className="border-t border-[#E6ECE6] pt-6">
+              <div className="mb-3"><p className="eyebrow">Histórico livre</p><h3 className="font-display text-lg font-extrabold tracking-[-0.035em] text-[#27302D]">Observações</h3></div>
+              <form onSubmit={submitNote} className="rounded-2xl border border-[#DCE7DF] bg-[#F8FAF8] p-3"><textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} rows={3} placeholder="Registre contexto, objeções, acordos ou próximos passos..." className="w-full resize-none bg-transparent text-sm leading-6 text-[#34413B] outline-none placeholder:text-[#9BA7A0]" /><div className="mt-3 flex justify-end border-t border-[#E1E8E2] pt-3"><Button type="submit" size="sm" className="gap-2 bg-[#18201E] hover:bg-[#087E5A]"><ClipboardList size={15} />Adicionar nota</Button></div></form>
+              <div className="mt-3 space-y-2">{notes.map((note) => <article key={note.id} className="rounded-xl border border-[#E6ECE6] bg-white p-3"><p className="whitespace-pre-wrap text-sm leading-6 text-[#46534D]">{note.content}</p><p className="mt-2 text-[10px] font-bold uppercase tracking-[0.11em] text-[#8A9690]">{new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(note.createdAt))}</p></article>)}{notes.length === 0 && <p className="px-1 text-sm text-[#829087]">As observações da negociação aparecerão aqui.</p>}</div>
+            </section>
+          </div>
+
+          <aside className="space-y-6 bg-[#F8FAF8] p-5 sm:p-7">
+            <section><div className="mb-3 flex items-center gap-2"><Users size={16} className="text-[#087E5A]" /><div><p className="eyebrow">Pessoa</p><h3 className="font-display text-base font-extrabold tracking-[-0.035em] text-[#27302D]">Contato principal</h3></div></div><div className="grid gap-3"><FormField label="Nome"><Input value={deal.contactName ?? ""} onChange={(event) => onUpdate({ contactName: event.target.value })} placeholder="Nome do contato" /></FormField><FormField label="Cargo"><Input value={deal.contactRole ?? ""} onChange={(event) => onUpdate({ contactRole: event.target.value })} placeholder="Ex.: Head de operações" /></FormField><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1"><FormField label="E-mail"><Input type="email" value={deal.contactEmail ?? ""} onChange={(event) => onUpdate({ contactEmail: event.target.value })} placeholder="contato@empresa.com" /></FormField><FormField label="Telefone"><Input value={deal.contactPhone ?? ""} onChange={(event) => onUpdate({ contactPhone: event.target.value })} placeholder="(11) 99999-9999" /></FormField></div></div></section>
+            <section className="border-t border-[#E1E8E2] pt-6"><div className="mb-3 flex items-center gap-2"><Building2 size={16} className="text-[#087E5A]" /><div><p className="eyebrow">Organização</p><h3 className="font-display text-base font-extrabold tracking-[-0.035em] text-[#27302D]">Dados da empresa</h3></div></div><div className="grid gap-3"><FormField label="Empresa"><Input value={deal.company} onChange={(event) => onUpdate({ company: event.target.value })} placeholder="Nome da organização" /></FormField><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1"><FormField label="Segmento"><Input value={companyData.industry ?? ""} onChange={(event) => updateCompany("industry", event.target.value)} placeholder="Ex.: Tecnologia" /></FormField><FormField label="Porte"><Input value={companyData.size ?? ""} onChange={(event) => updateCompany("size", event.target.value)} placeholder="Ex.: 51–200" /></FormField></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1"><FormField label="Cidade"><Input value={companyData.city ?? ""} onChange={(event) => updateCompany("city", event.target.value)} placeholder="Ex.: São Paulo" /></FormField><FormField label="Site"><Input value={companyData.website ?? ""} onChange={(event) => updateCompany("website", event.target.value)} placeholder="empresa.com.br" /></FormField></div></div></section>
+          </aside>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal, onEditGoal, onDeleteGoal }: { goals: GoalItem[]; achievedRevenue: number; averageGoalProgress: number; onNewGoal: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void }) {
@@ -1006,7 +1170,7 @@ function PipelineWorkspace({ funnels, activeFunnel, activeFunnelId, deals, wonDe
 }
 
 function MiniMetric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
-  return <div className={`rounded-xl border px-3 py-2 ${accent ? "border-[#BDE5D5] bg-[#E8F6F0]" : "border-[#E0E6E0] bg-white"}`}><p className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#7B8882]">{label}</p><p className={`mt-0.5 text-sm font-extrabold tracking-[-0.03em] ${accent ? "text-[#087E5A]" : "text-[#27302D]"}`}>{value}</p></div>;
+  return <div className={`metric-instrument rounded-xl border px-3 py-2 ${accent ? "border-[#BDE5D5] bg-[#E8F6F0]" : "border-[#E0E6E0] bg-white"}`}><p className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#7B8882]">{label}</p><p className={`mt-0.5 text-sm font-extrabold tracking-[-0.03em] ${accent ? "text-[#087E5A]" : "text-[#27302D]"}`}>{value}</p></div>;
 }
 
 function WonDropzone({ stage, deals, isOver, onDragOver, onDrop }: { stage: Stage; deals: Deal[]; isOver: boolean; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDrop: (stageId: string) => void }) {
@@ -1020,5 +1184,7 @@ function PipelineColumn({ stage, deals, isOver, draggedDealId, onEditStage, onEd
 }
 
 function DealCard({ deal, isDragging, onEdit, onDragStart, onDragEnd }: { deal: Deal; isDragging: boolean; onEdit: () => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onDragEnd: () => void }) {
-  return <div draggable onDragStart={(event) => onDragStart(event, deal.id)} onDragEnd={onDragEnd} onClick={onEdit} className={`deal-card group ${isDragging ? "deal-card-dragging" : ""}`} role="button" tabIndex={0} onKeyDown={(event) => event.key === "Enter" && onEdit()}><div className="mb-3 flex items-center justify-between gap-2"><span className="tag-chip bg-[#F3F5F1] text-[#617069]">{deal.tag}</span><GripVertical className="h-4 w-4 text-[#ADB8B1]" /></div><h3 className="font-display text-[15px] font-bold leading-5 tracking-[-0.025em] text-[#29332F]">{deal.title}</h3><div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[#728079]"><Building2 size={13} /><span className="truncate">{deal.company}</span></div><div className="mt-4 flex items-end justify-between gap-2"><div><p className="text-base font-extrabold tracking-[-0.03em] text-[#1B2522]">{formatCurrency(deal.value)}</p><div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-[#718079]"><Clock3 size={12} /><span>{deal.nextActivity}</span></div></div><div className="grid h-7 w-7 place-items-center rounded-full bg-[#E7F2ED] text-[9px] font-extrabold text-[#087E5A]">{deal.owner}</div></div></div>;
+  const pendingActivities = (deal.activities ?? []).filter((activity) => !activity.done).length;
+  const noteCount = (deal.notes ?? []).length;
+  return <div draggable onDragStart={(event) => onDragStart(event, deal.id)} onDragEnd={onDragEnd} onClick={onEdit} className={`deal-card group ${isDragging ? "deal-card-dragging" : ""}`} role="button" tabIndex={0} onKeyDown={(event) => event.key === "Enter" && onEdit()}><div className="mb-3 flex items-center justify-between gap-2"><span className="tag-chip bg-[#F3F5F1] text-[#617069]">{deal.tag}</span><GripVertical className="h-4 w-4 text-[#ADB8B1]" /></div><h3 className="font-display text-[15px] font-bold leading-5 tracking-[-0.025em] text-[#29332F]">{deal.title}</h3><div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[#728079]"><Building2 size={13} /><span className="truncate">{deal.company}</span></div>{(pendingActivities > 0 || noteCount > 0 || deal.contactName) && <div className="mt-3 flex flex-wrap gap-1.5">{pendingActivities > 0 && <span className="inline-flex items-center gap-1 rounded-md bg-[#E8F6F0] px-1.5 py-1 text-[10px] font-extrabold text-[#087E5A]"><Calendar size={11} />{pendingActivities}</span>}{noteCount > 0 && <span className="inline-flex items-center gap-1 rounded-md bg-[#F1F3F0] px-1.5 py-1 text-[10px] font-extrabold text-[#63706B]"><ClipboardList size={11} />{noteCount}</span>}{deal.contactName && <span className="inline-flex max-w-[112px] items-center gap-1 truncate rounded-md bg-[#F1F3F0] px-1.5 py-1 text-[10px] font-extrabold text-[#63706B]"><Users size={11} /><span className="truncate">{deal.contactName}</span></span>}</div>}<div className="mt-4 flex items-end justify-between gap-2"><div><p className="text-base font-extrabold tracking-[-0.03em] text-[#1B2522]">{formatCurrency(deal.value)}</p><div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-[#718079]"><Clock3 size={12} /><span>{deal.nextActivity}</span></div></div><div className="grid h-7 w-7 place-items-center rounded-full bg-[#E7F2ED] text-[9px] font-extrabold text-[#087E5A]">{deal.owner}</div></div></div>;
 }
