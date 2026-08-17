@@ -77,5 +77,7 @@
 - [x] Republicar a melhoria no GitHub e no Netlify.
 - [x] Inserir novos contatos no topo da Lista de Prospecção.
 - [x] Validar e republicar a ordenação dos novos contatos.
-- [ ] Usar o padrão `Lista - Mês - Sem N` ao criar novas listas de prospecção.
-- [ ] Validar e republicar o novo padrão de nomes.
+- [x] Usar o padrão `Lista - Mês - Sem N` ao criar novas listas de prospecção.
+- [x] Validar e republicar o novo padrão de nomes.
+- [ ] Remover os indicadores de contatos, canais e análises da Lista de Prospecção.
+- [ ] Exibir apenas o contador de empresas preenchidas e republicar.
