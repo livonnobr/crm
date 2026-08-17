@@ -167,6 +167,15 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom"],
+          "ui-vendor": ["lucide-react", "sonner", "wouter"],
+          "query-vendor": ["@tanstack/react-query", "@trpc/client", "superjson"],
+        },
+      },
+    },
   },
   server: {
     host: true,

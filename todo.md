@@ -97,7 +97,7 @@
 - [x] Hidratar Lista de Prospecção e lixeira a partir do Supabase após autenticação.
 - [x] Espelhar automaticamente edições, novas linhas, exclusões e restaurações da Lista no Supabase.
 - [x] Espelhar automaticamente inclusões, edições, exclusões de funis, etapas e oportunidades no Supabase.
-- [ ] Publicar a persistência completa da Lista e do Funil no GitHub e no Netlify.
+- [x] Publicar a persistência completa da Lista e do Funil no GitHub e no Netlify.
 
 ## Integração Google Agenda e Meet
 
@@ -141,8 +141,16 @@
 - [x] Criar a aba Financeiro no menu lateral do CRM.
 - [x] Implementar o painel financeiro inspirado na planilha, com entradas editáveis e cálculos automáticos.
 - [x] Validar cálculos, responsividade e sincronização com Supabase.
-- [ ] Publicar a aba Financeiro no GitHub e no Netlify.
+- [x] Publicar a aba Financeiro no GitHub e no Netlify.
 - [x] Confirmar no Supabase a criação da tabela `finance_entries` e registrar o esquema aplicado.
-- [ ] Validar a aba Financeiro autenticada com leitura, criação, edição e exclusão real no Supabase.
+- [ ] Validar a aba Financeiro autenticada com leitura, criação, edição e exclusão real no Supabase. (requer interação autenticada real do usuário)
 - [x] Validar a aba Financeiro em viewport móvel/estreita e ajustar o layout se necessário.
 - [x] Revisar os cálculos automáticos do Financeiro com um caso manual baseado na planilha de origem.
+- [x] Publicar a aba Financeiro na branch `ritmo-crm` do GitHub pelo fluxo oficial e confirmar o commit remoto.
+- [x] Executar e confirmar o deploy do Financeiro no Netlify com status pronto.
+- [x] Validar no domínio público do Netlify a rota `/?aba=financeiro` com a versão atual.
+## Correção do deploy público Financeiro
+- [x] Diagnosticar por que o domínio Netlify está carregando título sem renderizar o CRM.
+- [x] Corrigir o artefato/build enviado ao Netlify, se necessário.
+- [x] Refazer o deploy pelo conector Netlify existente.
+- [x] Validar a rota pública `/?aba=financeiro` com o painel renderizado.
