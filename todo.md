@@ -52,3 +52,5 @@
 - [x] Adicionar ícone de lixeira visível em cada card de negócio, com confirmação antes da exclusão.
 - [ ] Publicar a melhoria da lixeira no GitHub e no Netlify; não usar Manus como destino de produção.
 - [ ] Registrar que mudanças de esquema ou dados estruturais devem ser aplicadas no Supabase; mudanças apenas de frontend não exigem nova migração.
+- [ ] Após a reconexão, validar a sessão do GitHub e enviar o branch `ritmo-crm`.
+- [ ] Confirmar no remoto que o commit mais recente contém a versão publicada no Netlify.
