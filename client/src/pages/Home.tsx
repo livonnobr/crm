@@ -54,8 +54,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { getSupabaseClient, isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { summarizeFinanceEntries } from "@/lib/finance";
 
-type Page = "goals" | "pipeline" | "activities" | "prospecting" | "cadence";
+type Page = "goals" | "pipeline" | "activities" | "prospecting" | "cadence" | "finance";
+
+type FinanceEntry = {
+  id: string;
+  expense: string;
+  amount: number;
+  installment: string;
+  dueDate: string;
+  notes: string;
+};
+
+type FinanceEntryRow = {
+  id: string;
+  workspace_id: string;
+  expense: string;
+  amount: number | string;
+  installment: string;
+  due_date: string | null;
+  notes: string;
+  position: number;
+};
 
 type ProspectRecord = {
   id: string;
@@ -468,7 +489,7 @@ export default function Home() {
 
   const [page, setPage] = useState<Page>(() => {
     const tab = new URLSearchParams(window.location.search).get("aba");
-    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : tab === "cadencia" ? "cadence" : tab === "prospeccao" ? "prospecting" : "goals";
+    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : tab === "cadencia" ? "cadence" : tab === "prospeccao" ? "prospecting" : tab === "financeiro" ? "finance" : "goals";
   });
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [isSidebarHovering, setIsSidebarHovering] = useState(false);
@@ -479,6 +500,7 @@ export default function Home() {
   const [prospectLists, setProspectLists] = useState<ProspectList[]>(() => storedProspectLists());
   const [trashedProspectLists, setTrashedProspectLists] = useState<TrashedProspectList[]>(() => storedTrashedProspectLists());
   const [cadenceBlocks, setCadenceBlocks] = useState<CadenceBlock[]>(() => storedValue("ritmo-cadence-blocks", initialCadenceBlocks));
+  const [financeEntries, setFinanceEntries] = useState<FinanceEntry[]>(() => storedValue("ritmo-finance-entries", []));
   const [draggedCadenceId, setDraggedCadenceId] = useState<string | null>(null);
   const [cadenceEditId, setCadenceEditId] = useState<string | null>(null);
   const [activeProspectListId, setActiveProspectListId] = useState(() => storedValue("ritmo-active-prospect-list", "prospect-list-default"));
@@ -538,16 +560,17 @@ export default function Home() {
       currentWorkspaceId = createdWorkspace.id as string;
     }
 
-    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }] = await Promise.all([
+    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }, { data: financeRows, error: financeError }] = await Promise.all([
       client.from("goals").select("id, title, goal_type, target, actual, unit, period, color").eq("workspace_id", currentWorkspaceId).order("created_at", { ascending: false }),
       client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
       client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
       client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
       client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_email, decision_maker_phone, company, company_website, analysis, position").order("position"),
       client.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
+      client.from("finance_entries").select("id, workspace_id, expense, amount, installment, due_date, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
     ]);
 
-    if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError || cadenceBlocksError) {
+    if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError || cadenceBlocksError || financeError) {
       toast.error("Não foi possível carregar os dados salvos.");
       setIsCloudLoading(false);
       setIsCloudHydrating(false);
@@ -582,6 +605,7 @@ export default function Home() {
     const normalizedProspectTrash = hasCloudProspectData ? cloudProspectLists.filter((list): list is TrashedProspectList => Boolean(list.deletedAt && new Date(list.deletedAt).getTime() > Date.now() - PROSPECT_TRASH_RETENTION_MS)) : trashedProspectLists;
 
     const normalizedCadenceBlocks = ((cadenceBlockRows ?? []) as CadenceBlockRow[]).map((block) => ({ id: block.id, day: Number(block.day), slot: block.slot, title: block.title, channel: block.channel, notes: block.notes }));
+    const normalizedFinanceEntries = ((financeRows ?? []) as FinanceEntryRow[]).map((entry) => ({ id: entry.id, expense: entry.expense, amount: Number(entry.amount), installment: entry.installment, dueDate: entry.due_date ?? "", notes: entry.notes }));
 
     const normalizedGoals = ((goalRows ?? []) as GoalRecord[]).map((goal) => ({
       id: goal.id,
@@ -627,6 +651,7 @@ export default function Home() {
     setConversionRates({ ...defaultConversionRates(normalizedFunnels), ...((conversionSettingsRow as ConversionSettingsRecord | null)?.rates ?? {}) });
     setDeals(normalizedDeals);
     setCadenceBlocks(normalizedCadenceBlocks.length ? normalizedCadenceBlocks : initialCadenceBlocks);
+    setFinanceEntries(normalizedFinanceEntries);
     setProspectLists(normalizedProspectLists.length ? normalizedProspectLists : initialProspectLists);
     setTrashedProspectLists(normalizedProspectTrash);
     setActiveProspectListId(normalizedProspectLists[0]?.id ?? initialProspectLists[0].id);
@@ -693,8 +718,9 @@ export default function Home() {
       window.localStorage.setItem("ritmo-prospect-trash", JSON.stringify(trashedProspectLists));
       window.localStorage.setItem("ritmo-active-prospect-list", activeProspectListId);
       window.localStorage.setItem("ritmo-cadence-blocks", JSON.stringify(cadenceBlocks));
+      window.localStorage.setItem("ritmo-finance-entries", JSON.stringify(financeEntries));
     }
-  }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, workspaceId]);
+  }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, financeEntries, workspaceId]);
 
   useEffect(() => {
     if (!workspaceId || !supabase || isCloudHydrating) return;
@@ -754,9 +780,14 @@ export default function Home() {
       const staleCadenceIds = ((existingCadenceBlocks ?? []) as Array<{ id: string }>).map((block) => block.id).filter((id) => !cadenceIds.includes(id));
       if (staleCadenceIds.length) await client.from("cadence_blocks").delete().in("id", staleCadenceIds);
       if (cadenceBlocks.length) await client.from("cadence_blocks").upsert(cadenceBlocks.map((block, position) => ({ id: block.id, workspace_id: workspaceId, day: block.day, slot: block.slot, title: block.title, channel: block.channel, notes: block.notes, position, updated_at: new Date().toISOString() })));
+      const { data: existingFinanceEntries } = await client.from("finance_entries").select("id").eq("workspace_id", workspaceId);
+      const financeIds = financeEntries.map((entry) => entry.id);
+      const staleFinanceIds = ((existingFinanceEntries ?? []) as Array<{ id: string }>).map((entry) => entry.id).filter((id) => !financeIds.includes(id));
+      if (staleFinanceIds.length) await client.from("finance_entries").delete().in("id", staleFinanceIds);
+      if (financeEntries.length) await client.from("finance_entries").upsert(financeEntries.map((entry, position) => ({ id: entry.id, workspace_id: workspaceId, expense: entry.expense, amount: entry.amount, installment: entry.installment, due_date: entry.dueDate || null, notes: entry.notes, position, updated_at: new Date().toISOString() })));
     };
     void syncCloudState();
-  }, [goals, funnels, deals, conversionRates, cadenceBlocks, workspaceId, isCloudHydrating]);
+  }, [goals, funnels, deals, conversionRates, cadenceBlocks, financeEntries, workspaceId, isCloudHydrating]);
 
   const activeFunnel = funnels.find((funnel) => funnel.id === activeFunnelId) ?? funnels[0];
   const funnelDeals = useMemo(
@@ -785,10 +816,23 @@ export default function Home() {
     setPage(nextPage);
     const url = new URL(window.location.href);
     if (nextPage === "goals") url.searchParams.delete("aba");
-    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : nextPage === "cadence" ? "cadencia" : "prospeccao");
+    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : nextPage === "cadence" ? "cadencia" : nextPage === "finance" ? "financeiro" : "prospeccao");
     window.history.replaceState({}, "", url);
   }
 
+  function addFinanceEntry() {
+    const nextEntry: FinanceEntry = { id: uniqueId("finance"), expense: "Novo lançamento", amount: 0, installment: "1/1", dueDate: new Date().toISOString().slice(0, 10), notes: "" };
+    setFinanceEntries((current) => [nextEntry, ...current]);
+    setPage("finance");
+    toast.success("Lançamento financeiro adicionado.");
+  }
+  function updateFinanceEntry(id: string, field: keyof Omit<FinanceEntry, "id">, value: string | number) {
+    setFinanceEntries((current) => current.map((entry) => entry.id === id ? { ...entry, [field]: field === "amount" ? Number(value) || 0 : value } : entry));
+  }
+  function deleteFinanceEntry(id: string) {
+    setFinanceEntries((current) => current.filter((entry) => entry.id !== id));
+    toast.success("Lançamento removido.");
+  }
   function addCadenceBlock(day: number, slot: CadenceSlot) {
     if (cadenceBlocks.some((block) => block.day === day && block.slot === slot)) { toast.info("Essa célula já tem uma ação."); return; }
     const nextBlock: CadenceBlock = { id: uniqueId("cadence"), day, slot, title: "Nova ação", channel: "Tarefa", notes: "Defina o próximo passo comercial." };
@@ -1241,6 +1285,7 @@ export default function Home() {
             <SidebarItem icon={<Calendar size={19} />} label="Atividades" active={page === "activities"} onClick={() => selectPage("activities")} />
             <SidebarItem icon={<ClipboardList size={19} />} label="Empresas" active={page === "prospecting"} onClick={() => selectPage("prospecting")} />
             <SidebarItem icon={<GitBranch size={19} />} label="Cadência" active={page === "cadence"} onClick={() => selectPage("cadence")} />
+            <SidebarItem icon={<CircleDollarSign size={19} />} label="Financeiro" active={page === "finance"} onClick={() => selectPage("finance")} />
           </SidebarMenu>
         </SidebarGroup>
 
@@ -1286,7 +1331,7 @@ export default function Home() {
           <img className="h-8 w-8 rounded-lg" src={logoUrl} alt="" />
           <span className="font-display text-lg font-extrabold tracking-[-0.06em]">ritmo</span>
         </div>
-        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" ? addProspect : page === "cadence" ? () => addCadenceBlock(1, "morning") : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
+        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" ? addProspect : page === "cadence" ? () => addCadenceBlock(1, "morning") : page === "finance" ? addFinanceEntry : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
           <Plus className="h-5 w-5" />
         </button>
       </div>
@@ -1337,6 +1382,8 @@ export default function Home() {
           <ActivitiesWorkspace deals={openDeals} onToggleActivity={toggleWorkspaceActivity} onOpenDeal={openDealDetail} onNewDeal={openNewDeal} />
         ) : page === "cadence" ? (
           <CadenceWorkspace blocks={cadenceBlocks} onAdd={addCadenceBlock} onMove={moveCadenceBlock} onEdit={editCadenceBlock} onDelete={deleteCadenceBlock} />
+        ) : page === "finance" ? (
+          <FinanceWorkspace entries={financeEntries} onAdd={addFinanceEntry} onUpdate={updateFinanceEntry} onDelete={deleteFinanceEntry} />
         ) : (
           <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} />
         )}
@@ -1742,6 +1789,19 @@ function PipelineColumn({ stage, deals, isOver, draggedDealId, onEditStage, onEd
   const columnValue = deals.reduce((sum, deal) => sum + deal.value, 0);
   const estimatedColumnValue = columnValue * (stage.probability / 100);
   return <section onDragOver={(event) => onDragOver(event, stage.id)} onDrop={(event) => { event.preventDefault(); onDrop(stage.id, event); }} className={`pipeline-column ${isOver ? "pipeline-column-over" : ""}`}><header className="mb-4 flex items-center gap-2 px-1"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} /><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-extrabold text-[#2C3632]">{stage.name}</h2><p className="mt-0.5 text-xs text-[#7B8882]">{deals.length} {deals.length === 1 ? "negócio" : "negócios"} · {stage.probability}%</p></div><button onClick={onEditStage} className="icon-button h-7 w-7 opacity-70 hover:opacity-100" aria-label={`Editar etapa ${stage.name}`}><MoreHorizontal size={16} /></button></header><div className="column-instrument-grid mb-4 grid grid-cols-2 gap-2 px-1 py-2.5"><div><p className="text-[9px] font-extrabold uppercase tracking-[0.11em] text-[#829089]">Em aberto</p><p className="column-value mt-0.5 text-sm font-extrabold tracking-[-0.02em] text-[#44524C]">{formatCurrency(columnValue)}</p></div><div className="column-estimated-value border-l border-[#DCE9E2] pl-2.5"><p className="text-[9px] font-extrabold uppercase tracking-[0.11em] text-[#0A8C65]">Estimado</p><p className="mt-0.5 text-sm font-extrabold tracking-[-0.02em] text-[#087E5A]">{formatCurrency(estimatedColumnValue)}</p></div></div><div className="min-h-[420px] space-y-3">{deals.map((deal) => <DealCard key={deal.id} deal={deal} isDragging={draggedDealId === deal.id} onEdit={() => onEditDeal(deal)} onDelete={() => onDeleteDeal(deal)} onDragStart={onDragStart} onDragEnd={onDragEnd} />)}{deals.length === 0 && <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[#D6DED8] bg-white/45 p-4 text-center text-xs font-medium text-[#87928D]">Solte uma oportunidade aqui</div>}</div></section>;
+}
+
+function FinanceWorkspace({ entries, onAdd, onUpdate, onDelete }: { entries: FinanceEntry[]; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<FinanceEntry, "id">, value: string | number) => void; onDelete: (id: string) => void }) {
+  const today = new Date();
+  const { total, count, nextDue, daysRemaining } = summarizeFinanceEntries(entries, today);
+  return <div className="grid gap-5 pb-8">
+    <div className="flex flex-col gap-4 rounded-[26px] border border-[#E3E9E3] bg-[#FCFCFA] p-5 shadow-[0_12px_32px_rgba(30,55,44,0.04)] sm:flex-row sm:items-end sm:justify-between">
+      <div><p className="eyebrow">Controle financeiro</p><h1 className="font-display text-3xl font-bold tracking-[-0.04em] text-[#27302D]">Financeiro<span className="text-[#10A97A]">.</span></h1><p className="mt-2 max-w-xl text-sm text-[#77847D]">Acompanhe despesas, parcelas e próximos vencimentos em uma bancada simples e editável.</p></div>
+      <Button onClick={onAdd} className="w-full bg-[#10A97A] text-white hover:bg-[#087E5A] sm:w-auto"><Plus size={16} /> Novo lançamento</Button>
+    </div>
+    <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Total lançado</p><p className="mt-2 text-2xl font-bold text-[#087E5A]">{formatCurrency(total)}</p><p className="mt-1 text-xs text-[#8A958F]">{count} {count === 1 ? "despesa" : "despesas"}</p></div><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Próximo vencimento</p><p className="mt-2 text-base font-bold text-[#27302D]">{nextDue?.expense || "Nenhum lançamento"}</p><p className="mt-1 text-xs text-[#8A958F]">{daysRemaining === null ? "Cadastre uma data" : daysRemaining < 0 ? `Vencido há ${Math.abs(daysRemaining)} dias` : `${daysRemaining} dias restantes`}</p></div><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Período</p><p className="mt-2 text-base font-bold text-[#27302D]">Visão atual</p><p className="mt-1 text-xs text-[#8A958F]">Atualização automática dos valores</p></div></div>
+    <div className="overflow-hidden rounded-[26px] border border-[#E3E9E3] bg-[#FCFCFA] shadow-[0_12px_32px_rgba(30,55,44,0.04)]"><div className="flex items-center justify-between border-b border-[#E7EBE6] px-5 py-4"><div><p className="eyebrow">Lançamentos</p><h2 className="font-display text-lg font-bold text-[#27302D]">Despesas e compromissos</h2></div><span className="rounded-full bg-[#E7F5EF] px-3 py-1 text-xs font-bold text-[#087E5A]">{formatCurrency(total)}</span></div><div className="overflow-x-auto"><table className="min-w-[780px] w-full text-left"><thead className="bg-[#F1F5F0] text-[10px] uppercase tracking-[0.14em] text-[#6F7D75]"><tr><th className="px-4 py-3">Despesa</th><th className="px-4 py-3">Valor</th><th className="px-4 py-3">Parcela</th><th className="px-4 py-3">Data</th><th className="px-4 py-3">Faltam</th><th className="px-4 py-3"></th></tr></thead><tbody>{entries.map((entry) => { const remaining = entry.dueDate ? Math.ceil((new Date(`${entry.dueDate}T23:59:59`).getTime() - today.getTime()) / 86400000) : null; return <tr key={entry.id} className="border-t border-[#EDF0EC] align-top"><td className="px-4 py-3"><Input value={entry.expense} onChange={(event) => onUpdate(entry.id, "expense", event.target.value)} placeholder="Ex.: Aluguel" className="min-w-[190px] bg-white" /></td><td className="px-4 py-3"><Input type="number" min="0" step="0.01" value={entry.amount} onChange={(event) => onUpdate(entry.id, "amount", Number(event.target.value))} className="w-[130px] bg-white" /></td><td className="px-4 py-3"><Input value={entry.installment} onChange={(event) => onUpdate(entry.id, "installment", event.target.value)} placeholder="Parcela 1 de 12" className="min-w-[150px] bg-white" /></td><td className="px-4 py-3"><Input type="date" value={entry.dueDate} onChange={(event) => onUpdate(entry.id, "dueDate", event.target.value)} className="w-[150px] bg-white" /></td><td className="px-4 py-3 text-sm font-semibold text-[#087E5A]">{remaining === null ? "—" : remaining < 0 ? `-${Math.abs(remaining)}d` : `${remaining}d`}</td><td className="px-4 py-3"><button onClick={() => onDelete(entry.id)} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${entry.expense || "lançamento"}`}><Trash2 size={15} /></button></td></tr> })}</tbody></table>{!entries.length && <div className="px-5 py-12 text-center text-sm text-[#7D8983]">Nenhum lançamento ainda. Adicione a primeira despesa para começar.</div>}</div></div>
+  </div>;
 }
 
 function ActivitiesWorkspace({ deals, onToggleActivity, onOpenDeal, onNewDeal }: { deals: Deal[]; onToggleActivity: (deal: Deal, activity: DealActivity) => void; onOpenDeal: (deal: Deal) => void; onNewDeal: () => void }) {

@@ -133,3 +133,16 @@
 - [x] Aplicar o padrão visual ivory, graphite e emerald do Ritmo CRM.
 - [x] Validar responsividade e publicar a Cadência no GitHub e no Netlify.
 - [x] Validar a aba Cadência em viewport móvel/estreita e ajustar a grade se necessário.
+
+## Aba Financeiro
+
+- [x] Inspecionar a planilha Google compartilhada e mapear abas, campos, fórmulas e indicadores.
+- [x] Definir o modelo financeiro persistente no Supabase.
+- [x] Criar a aba Financeiro no menu lateral do CRM.
+- [x] Implementar o painel financeiro inspirado na planilha, com entradas editáveis e cálculos automáticos.
+- [x] Validar cálculos, responsividade e sincronização com Supabase.
+- [ ] Publicar a aba Financeiro no GitHub e no Netlify.
+- [x] Confirmar no Supabase a criação da tabela `finance_entries` e registrar o esquema aplicado.
+- [ ] Validar a aba Financeiro autenticada com leitura, criação, edição e exclusão real no Supabase.
+- [x] Validar a aba Financeiro em viewport móvel/estreita e ajustar o layout se necessário.
+- [x] Revisar os cálculos automáticos do Financeiro com um caso manual baseado na planilha de origem.
