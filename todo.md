@@ -50,3 +50,5 @@
 - [x] Renomear o indicador Ponderado para Previsão no funil.
 - [x] Corrigir a soltura de oportunidades em Ganho e Perdido para atualizar o negócio e finalizar o arraste.
 - [x] Adicionar ícone de lixeira visível em cada card de negócio, com confirmação antes da exclusão.
+- [ ] Publicar a melhoria da lixeira no GitHub e no Netlify; não usar Manus como destino de produção.
+- [ ] Registrar que mudanças de esquema ou dados estruturais devem ser aplicadas no Supabase; mudanças apenas de frontend não exigem nova migração.
