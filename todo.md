@@ -72,6 +72,8 @@
 - [x] Publicar a melhoria da Lixeira no GitHub e no Netlify.
 - [x] Adicionar exportação da lista ativa em CSV e Excel compatível (.xls).
 - [x] Documentar que o salvamento atual é automático no navegador, sem sincronização entre dispositivos.
-- [ ] Aumentar a altura da área de edição da coluna Análise.
-- [ ] Configurar Ctrl+Enter para inserir uma linha em branco na Análise.
-- [ ] Republicar a melhoria no GitHub e no Netlify.
+- [x] Aumentar a altura da área de edição da coluna Análise.
+- [x] Configurar Ctrl+Enter para inserir uma linha em branco na Análise.
+- [x] Republicar a melhoria no GitHub e no Netlify.
+- [ ] Inserir novos contatos no topo da Lista de Prospecção.
+- [ ] Validar e republicar a ordenação dos novos contatos.

@@ -617,7 +617,7 @@ export default function Home() {
 
   function addProspect() {
     if (!activeProspectList) return;
-    setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, records: [...list.records, { ...blankProspect, id: uniqueId("prospect") }] } : list));
+    setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, records: [{ ...blankProspect, id: uniqueId("prospect") }, ...list.records] } : list));
     toast.success("Nova linha adicionada à lista de prospecção.");
   }
 
