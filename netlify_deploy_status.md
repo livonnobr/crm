@@ -25,3 +25,11 @@ Fonte consultada: https://app.netlify.com/projects/jocular-profiterole-c5dafc/de
 - **Deploy:** `6a836ef9e2665a23cd485922`, estado `ready`, publicado em 17/08/2026 às 20:28:50 UTC, com 4 arquivos novos e 1 regra de redirecionamento processada.
 - **URL pública:** https://jocular-profiterole-c5dafc.netlify.app/
 - **Preview do deploy:** https://6a836ef9e2665a23cd485922--jocular-profiterole-c5dafc.netlify.app
+
+## Atualização — Metas com periodicidade e contagem regressiva
+
+- **GitHub:** branch `ritmo-crm` sincronizado no commit `73c46ea3`.
+- **Netlify:** deploy direto confirmado pelo conector no site `54eea3a3-8519-4192-9321-84aa4375b29f`.
+- **Deploy:** `6a8375e86082d9437fc3d18c`, estado `ready`, publicado em 17/08/2026 às 20:58:21 UTC.
+- **URL pública:** https://jocular-profiterole-c5dafc.netlify.app/
+- **Preview do deploy:** https://6a8375e86082d9437fc3d18c--jocular-profiterole-c5dafc.netlify.app

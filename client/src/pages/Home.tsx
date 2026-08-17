@@ -91,6 +91,8 @@ type GoalItem = {
   unit: GoalUnit;
   period: string;
   cadence: GoalCadence;
+  linkedFunnelId?: string;
+  linkedStageId?: string;
   color: "emerald" | "blue" | "amber" | "violet";
 };
 
@@ -126,6 +128,7 @@ type CompanyData = {
   size?: string;
   website?: string;
   city?: string;
+  __ritmoStageHistory?: string[];
 };
 
 type Deal = {
@@ -144,6 +147,7 @@ type Deal = {
   companyData?: CompanyData;
   activities?: DealActivity[];
   notes?: DealNote[];
+  stageHistory?: string[];
 };
 
 type GoalRecord = {
@@ -155,11 +159,13 @@ type GoalRecord = {
   unit: GoalUnit;
   period: string;
   color: GoalItem["color"];
+  linked_funnel_id?: string | null;
+  linked_stage_id?: string | null;
 };
 
 type FunnelRecord = { id: string; name: string; currency: string; position: number };
 type StageRecord = { id: string; funnel_id: string; name: string; color: string; probability: number; position: number };
-type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null; notes?: DealNote[] | null };
+type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null;   notes?: DealNote[] | null; stage_history?: string[] | null };
 
 const logoUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/XzvVLbbQIKNxqUWR.png";
 const heroUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/jujGClJPiwgthxhk.jpg";
@@ -226,6 +232,7 @@ const initialDeals: Deal[] = [
     value: 28000,
     owner: "AR",
     stageId: "lead",
+    stageHistory: ["lead"],
     tag: "Inbound",
     nextActivity: "Hoje, 16:30",
   },
@@ -290,6 +297,8 @@ const blankGoal: GoalItem = {
   unit: "atividades",
   period: "Agosto 2026",
   cadence: "Mensal",
+  linkedFunnelId: "",
+  linkedStageId: "",
   color: "emerald",
 };
 
@@ -337,6 +346,7 @@ const blankDeal: Deal = {
   companyData: {},
   activities: [],
   notes: [],
+  stageHistory: [],
 };
 
 function storedValue<T>(key: string, fallback: T): T {
@@ -382,6 +392,19 @@ function progressOf(goal: GoalItem) {
   return Math.min(100, Math.round((goal.actual / Math.max(goal.target, 1)) * 100));
 }
 
+function dealEnteredStage(deal: Deal, stageId: string) {
+  return (deal.stageHistory?.length ? deal.stageHistory : [deal.stageId]).includes(stageId);
+}
+
+function accumulatedStageCount(deals: Deal[], stageId: string) {
+  return deals.filter((deal) => dealEnteredStage(deal, stageId)).length;
+}
+
+function recordStageVisit(deal: Deal, stageId: string): Deal {
+  const history = deal.stageHistory?.length ? deal.stageHistory : [deal.stageId];
+  return history.includes(stageId) ? { ...deal, stageId } : { ...deal, stageId, stageHistory: [...history, stageId] };
+}
+
 function uniqueId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -405,7 +428,7 @@ export default function Home() {
   const [isSidebarHovering, setIsSidebarHovering] = useState(false);
   const [goals, setGoals] = useState<GoalItem[]>(() => storedValue("ritmo-goals", initialGoals));
   const [funnels, setFunnels] = useState<SalesFunnel[]>(() => storedValue("ritmo-funnels", initialFunnels));
-  const [deals, setDeals] = useState<Deal[]>(() => storedValue("ritmo-deals", initialDeals));
+  const [deals, setDeals] = useState<Deal[]>(() => storedValue<Deal[]>("ritmo-deals", initialDeals).map((deal) => ({ ...deal, stageHistory: deal.stageHistory?.length ? deal.stageHistory : [deal.stageId] })));
   const [prospectLists, setProspectLists] = useState<ProspectList[]>(() => storedProspectLists());
   const [trashedProspectLists, setTrashedProspectLists] = useState<TrashedProspectList[]>(() => storedTrashedProspectLists());
   const [activeProspectListId, setActiveProspectListId] = useState(() => storedValue("ritmo-active-prospect-list", "prospect-list-default"));
@@ -502,6 +525,8 @@ export default function Home() {
       period: cleanGoalPeriod(goal.period),
       cadence: parseGoalCadence(goal.period),
       color: goal.color,
+      linkedFunnelId: goal.linked_funnel_id ?? "",
+      linkedStageId: goal.linked_stage_id ?? "",
     }));
     const normalizedStages = (stageRows ?? []) as StageRecord[];
     const normalizedFunnels = cloudFunnels.map((funnel) => ({
@@ -523,9 +548,10 @@ export default function Home() {
       contactRole: deal.contact_role ?? "",
       contactEmail: deal.contact_email ?? "",
       contactPhone: deal.contact_phone ?? "",
-      companyData: deal.company_data ?? {},
+      companyData: (() => { const data = deal.company_data ?? {}; return data.__ritmoStageHistory ? Object.fromEntries(Object.entries(data).filter(([key]) => key !== "__ritmoStageHistory")) : data; })(),
       activities: Array.isArray(deal.activities) ? deal.activities : [],
       notes: Array.isArray(deal.notes) ? deal.notes : [],
+      stageHistory: Array.isArray(deal.company_data?.__ritmoStageHistory) && deal.company_data.__ritmoStageHistory.length ? deal.company_data.__ritmoStageHistory : [deal.stage_id],
     }));
 
     setGoals(normalizedGoals);
@@ -603,7 +629,7 @@ export default function Home() {
       if (stageRows.length) await client.from("stages").upsert(stageRows);
       const opportunityRows = deals.flatMap((deal, position) => {
         const funnelId = stageToFunnel.get(deal.stageId);
-        return funnelId ? [{ id: deal.id, funnel_id: funnelId, stage_id: deal.stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? null, contact_role: deal.contactRole ?? null, contact_email: deal.contactEmail ?? null, contact_phone: deal.contactPhone ?? null, company_data: deal.companyData ?? {}, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : [];
+        return funnelId ? [{ id: deal.id, funnel_id: funnelId, stage_id: deal.stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? null, contact_role: deal.contactRole ?? null, contact_email: deal.contactEmail ?? null, contact_phone: deal.contactPhone ?? null, company_data: { ...(deal.companyData ?? {}), __ritmoStageHistory: deal.stageHistory ?? [deal.stageId] }, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : [];
       });
       if (opportunityRows.length) await client.from("opportunities").upsert(opportunityRows);
     };
@@ -626,10 +652,11 @@ export default function Home() {
     const stage = activeFunnel?.stages.find((item) => item.id === deal.stageId);
     return sum + deal.value * ((stage?.probability ?? 0) / 100);
   }, 0);
-  const achievedRevenue = goals
+  const computedGoals = useMemo(() => goals.map((goal) => goal.linkedStageId ? { ...goal, actual: accumulatedStageCount(deals, goal.linkedStageId) } : goal), [goals, deals]);
+  const achievedRevenue = computedGoals
     .filter((goal) => goal.unit === "R$")
     .reduce((sum, goal) => sum + goal.actual, 0);
-  const averageGoalProgress = goals.length ? Math.round(goals.reduce((sum, goal) => sum + progressOf(goal), 0) / goals.length) : 0;
+  const averageGoalProgress = computedGoals.length ? Math.round(computedGoals.reduce((sum, goal) => sum + progressOf(goal), 0) / computedGoals.length) : 0;
   const detailDeal = deals.find((deal) => deal.id === detailDealId);
 
   function selectPage(nextPage: Page) {
@@ -838,7 +865,7 @@ export default function Home() {
       setDeals((current) => current.map((deal) => (deal.id === dealDraft.id ? dealDraft : deal)));
       toast.success("Oportunidade atualizada.");
     } else {
-      setDeals((current) => [{ ...dealDraft, id: uniqueId("deal") }, ...current]);
+      setDeals((current) => [{ ...dealDraft, id: uniqueId("deal"), stageHistory: [dealDraft.stageId] }, ...current]);
       toast.success("Oportunidade criada.");
     }
     setDealDialogOpen(false);
@@ -867,7 +894,7 @@ export default function Home() {
     event?.preventDefault();
     const dealId = draggedDealId ?? event?.dataTransfer.getData("text/plain");
     if (!dealId || dealId === stageId) return;
-    setDeals((current) => current.map((deal) => (deal.id === dealId ? { ...deal, stageId } : deal)));
+    setDeals((current) => current.map((deal) => (deal.id === dealId ? recordStageVisit(deal, stageId) : deal)));
     clearDragState();
     const targetStage = activeFunnel?.stages.find((stage) => stage.id === stageId);
     toast.success(isWonStage(targetStage ?? { id: "", name: "", color: "", probability: 0 }) ? "Oportunidade marcada como ganha." : isLostStage(targetStage ?? { id: "", name: "", color: "", probability: 0 }) ? "Oportunidade marcada como perdida." : `Oportunidade movida para ${targetStage?.name ?? "a etapa"}.`);
@@ -883,7 +910,7 @@ export default function Home() {
     if (!wonStage) {
       setFunnels((current) => current.map((funnel) => funnel.id === activeFunnel.id ? { ...funnel, stages: [...funnel.stages, targetStage] } : funnel));
     }
-    setDeals((current) => current.map((deal) => deal.id === dealId ? { ...deal, stageId: targetStage.id } : deal));
+    setDeals((current) => current.map((deal) => deal.id === dealId ? recordStageVisit(deal, targetStage.id) : deal));
     clearDragState();
     toast.success("Oportunidade marcada como ganha.");
   }
@@ -897,7 +924,7 @@ export default function Home() {
     if (!lostStage) {
       setFunnels((current) => current.map((funnel) => funnel.id === activeFunnel.id ? { ...funnel, stages: [...funnel.stages, targetStage] } : funnel));
     }
-    setDeals((current) => current.map((deal) => deal.id === dealId ? { ...deal, stageId: targetStage.id } : deal));
+    setDeals((current) => current.map((deal) => deal.id === dealId ? recordStageVisit(deal, targetStage.id) : deal));
     clearDragState();
     toast.success("Oportunidade marcada como perdida.");
   }
@@ -1123,12 +1150,13 @@ export default function Home() {
       <main className="min-h-screen min-w-0 flex-1">
         {page === "goals" ? (
           <GoalsWorkspace
-            goals={goals}
+            goals={computedGoals}
             achievedRevenue={achievedRevenue}
             averageGoalProgress={averageGoalProgress}
             onNewGoal={openNewGoal}
             onEditGoal={openEditGoal}
             onDeleteGoal={deleteGoal}
+            funnels={funnels}
           />
         ) : page === "pipeline" ? (
           <PipelineWorkspace
@@ -1193,6 +1221,7 @@ export default function Home() {
               <FormField label="Realizado até agora"><Input min="0" type="number" value={goalDraft.actual || ""} onChange={(event) => setGoalDraft({ ...goalDraft, actual: Number(event.target.value) })} placeholder="0" /></FormField>
             </div>
             <div className="grid grid-cols-2 gap-4"><FormField label="Periodicidade"><select className="form-select" value={goalDraft.cadence} onChange={(event) => setGoalDraft({ ...goalDraft, cadence: event.target.value as GoalCadence })}><option>Diária</option><option>Semanal</option><option>Mensal</option></select></FormField><FormField label="Período"><Input value={goalDraft.period} onChange={(event) => setGoalDraft({ ...goalDraft, period: event.target.value })} placeholder="Agosto 2026" /></FormField></div>
+            <FormField label="Atualização automática pelo funil"><select className="form-select" value={goalDraft.linkedStageId ?? ""} onChange={(event) => { const stageId = event.target.value; const funnel = funnels.find((item) => item.stages.some((stage) => stage.id === stageId)); setGoalDraft({ ...goalDraft, linkedStageId: stageId, linkedFunnelId: funnel?.id ?? "" }); }}><option value="">Sem vínculo automático</option>{funnels.flatMap((funnel) => funnel.stages.map((stage) => <option key={`${funnel.id}-${stage.id}`} value={stage.id}>{funnel.name} · {stage.name}</option>))}</select><p className="mt-1 text-xs text-[#7D8983]">Cada oportunidade conta uma vez quando entra na etapa escolhida.</p></FormField>
             <div className="flex items-center justify-between border-t border-[#E8ECE6] pt-5">
               {goalDraft.id ? <button type="button" onClick={() => deleteGoal(goalDraft.id)} className="inline-flex items-center gap-2 text-sm font-bold text-[#B04A43]"><Trash2 size={16} />Excluir</button> : <span />}
               <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setGoalDialogOpen(false)}>Cancelar</Button><Button type="submit" className="bg-[#10A97A] hover:bg-[#087E5A]">Salvar meta</Button></div>
@@ -1342,7 +1371,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
   );
 }
 
-function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal, onEditGoal, onDeleteGoal }: { goals: GoalItem[]; achievedRevenue: number; averageGoalProgress: number; onNewGoal: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void }) {
+function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal, onEditGoal, onDeleteGoal, funnels }: { goals: GoalItem[]; achievedRevenue: number; averageGoalProgress: number; onNewGoal: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; funnels: SalesFunnel[] }) {
   const daysRemaining = daysUntilMonthEnd();
   const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date());
   return (
@@ -1375,7 +1404,7 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
           <div className="surface-panel p-4 sm:p-6">
             <div className="mb-5 flex items-end justify-between gap-3"><div><p className="eyebrow">Acompanhamento</p><h2 className="section-title">O que move sua receita</h2></div><button onClick={onNewGoal} className="hidden items-center gap-1 text-sm font-bold text-[#087E5A] hover:text-[#056448] sm:flex">Adicionar <ChevronRight size={16} /></button></div>
             <div className="space-y-3">
-              {goals.map((goal) => <GoalRow key={goal.id} goal={goal} onEdit={() => onEditGoal(goal)} onDelete={() => onDeleteGoal(goal.id)} />)}
+              {goals.map((goal) => <GoalRow key={goal.id} goal={goal} funnels={funnels} onEdit={() => onEditGoal(goal)} onDelete={() => onDeleteGoal(goal.id)} />)}
               {goals.length === 0 && <div className="grid min-h-48 place-items-center rounded-2xl border border-dashed border-[#D6DED8] bg-[#FAFBF9] p-6 text-center"><Target className="mb-2 h-6 w-6 text-[#10A97A]" /><div><p className="font-bold">Ainda não há metas</p><p className="mt-1 text-sm text-[#718078]">Crie uma meta de prospecção ou vendas para começar.</p></div></div>}
             </div>
           </div>
@@ -1389,10 +1418,10 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
   );
 }
 
-function GoalRow({ goal, onEdit, onDelete }: { goal: GoalItem; onEdit: () => void; onDelete: () => void }) {
+function GoalRow({ goal, funnels, onEdit, onDelete }: { goal: GoalItem; funnels: SalesFunnel[]; onEdit: () => void; onDelete: () => void }) {
   const progress = progressOf(goal);
   const styles = { emerald: "bg-[#10A97A]", blue: "bg-[#4386B6]", amber: "bg-[#D8952E]", violet: "bg-[#9075B5]" };
-  return <div className="group grid gap-4 rounded-2xl border border-[#E7EBE6] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8D0] hover:shadow-[0_12px_28px_rgba(30,55,44,0.05)] sm:grid-cols-[auto_minmax(190px,1fr)_minmax(175px,0.6fr)_auto] sm:items-center"><div className="goal-meter" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div><div className="mb-1 flex flex-wrap items-center gap-2"><span className="tag-chip">{goal.type}</span><span className="rounded-full bg-[#F0F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#63736B]">{goal.cadence}</span><span className="text-xs text-[#88938E]">{cleanGoalPeriod(goal.period)}</span></div><h3 className="font-display text-base font-bold tracking-[-0.025em] text-[#27302D]">{goal.title}</h3></div><div><div className="mb-2 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#35403B]">{formatGoalValue(goal.actual, goal.unit)}</span><span className="text-xs font-medium text-[#7D8983]">de {formatGoalValue(goal.target, goal.unit)}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className={`h-full rounded-full ${styles[goal.color]}`} style={{ width: `${progress}%` }} /></div></div><div className="flex justify-end gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100"><button onClick={onEdit} className="icon-button" aria-label={`Editar ${goal.title}`}><Pencil size={15} /></button><button onClick={onDelete} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${goal.title}`}><Trash2 size={15} /></button></div></div>;
+  return <div className="group grid gap-4 rounded-2xl border border-[#E7EBE6] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8D0] hover:shadow-[0_12px_28px_rgba(30,55,44,0.05)] sm:grid-cols-[auto_minmax(190px,1fr)_minmax(175px,0.6fr)_auto] sm:items-center"><div className="goal-meter" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div><div className="mb-1 flex flex-wrap items-center gap-2"><span className="tag-chip">{goal.type}</span><span className="rounded-full bg-[#F0F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#63736B]">{goal.cadence}</span><span className="text-xs text-[#88938E]">{cleanGoalPeriod(goal.period)}</span></div><h3 className="font-display text-base font-bold tracking-[-0.025em] text-[#27302D]">{goal.title}</h3>{goal.linkedStageId && <p className="mt-1 text-[11px] font-semibold text-[#087E5A]">Automática · {funnels.flatMap((funnel) => funnel.stages.map((stage) => funnel.name + " · " + stage.name)).find((label) => label.endsWith(" · " + funnels.flatMap((funnel) => funnel.stages).find((stage) => stage.id === goal.linkedStageId)?.name)) ?? "Etapa do funil"}</p>}</div><div><div className="mb-2 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#35403B]">{formatGoalValue(goal.actual, goal.unit)}</span><span className="text-xs font-medium text-[#7D8983]">de {formatGoalValue(goal.target, goal.unit)}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className={`h-full rounded-full ${styles[goal.color]}`} style={{ width: `${progress}%` }} /></div></div><div className="flex justify-end gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100"><button onClick={onEdit} className="icon-button" aria-label={`Editar ${goal.title}`}><Pencil size={15} /></button><button onClick={onDelete} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${goal.title}`}><Trash2 size={15} /></button></div></div>;
 }
 
 function ProspectingMetric({ label, value, detail, accent = false }: { label: string; value: string; detail: string; accent?: boolean }) {

@@ -83,3 +83,10 @@
 - [x] Exibir apenas o contador de empresas preenchidas e republicar.
 - [x] Compactar título, lista ativa e ações da Lista de Prospecção em uma linha.
 - [x] Validar responsividade e republicar o cabeçalho compacto.
+- [x] Adicionar periodicidade diária, semanal ou mensal ao cadastro de metas.
+- [x] Exibir no painel quantos dias faltam para o fim do mês.
+- [x] Publicar a melhoria de periodicidade e contagem regressiva no GitHub e no Netlify.
+- [ ] Permitir vincular metas a etapas e indicadores do funil.
+- [ ] Atualizar automaticamente o progresso ao movimentar oportunidades entre etapas.
+- [ ] Usar contagem acumulada: cada oportunidade soma uma vez ao entrar na etapa vinculada.
+- [ ] Validar e publicar a automação de metas e funil.
