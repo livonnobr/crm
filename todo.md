@@ -1,12 +1,19 @@
 # Publicação externa do Ritmo CRM
 
+- [x] Remover a coluna de etapa `Ganho` do quadro de funil.
+- [x] Criar uma zona de soltura `Ganhar oportunidade` no rodapé do funil.
+- [ ] Publicar o ajuste na branch `ritmo-crm` e no Netlify.
+
 - [x] Criar e identificar o projeto Supabase para a persistência do CRM.
 - [x] Migrar o modelo de metas, funis, etapas e oportunidades para o Supabase.
 - [x] Integrar a interface do CRM ao Supabase com autenticação por e-mail.
 - [x] Conectar a conta Netlify e criar o site do CRM.
-- [ ] Configurar o SPA e as URLs de redirecionamento de autenticação para o domínio Netlify.
-- [ ] Sincronizar o CRM na branch `ritmo-crm` do repositório existente `livonnobr/crm`.
-- [ ] Validar compilação, fluxo de dados e publicação externa no Netlify.
+- [x] Configurar o SPA e as URLs de redirecionamento de autenticação para o domínio Netlify.
+- [x] Sincronizar o CRM na branch `ritmo-crm` do repositório existente `livonnobr/crm`.
+- [x] Reenviar a branch `ritmo-crm` usando a credencial temporária fornecida pelo usuário, sem gravá-la no projeto.
+- [x] Validar compilação, fluxo de dados e publicação externa no Netlify.
+- [ ] Validar o retorno da autenticação por e-mail do Supabase para o domínio público do Netlify com um login real.
+- [x] Remover a proteção de acesso do site Netlify para liberar o domínio publicamente, conforme confirmação do usuário.
 
 ## Histórico
 
@@ -15,5 +22,7 @@
 - [ ] Finalizar o upload da versão `crm-metas-funil-netlify.zip`; o campo de arquivos do Netlify está oculto e não foi aceito pela automação de upload.
 - [x] Publicação de produção concluída em `https://jocular-profiterole-c5dafc.netlify.app` (deploy `6a834270315c53ff38f996e7`).
 - [x] A URL Netlify respondeu com o título `Ritmo — CRM de Metas e Funil`; falta validar o fluxo de autenticação após registrar o domínio no Supabase.
+- [x] Visibilidade `Public` aplicada e confirmada no Netlify para produção e previews.
 - [x] Conta GitHub identificada no navegador: `livonnobr`; a credencial local do GitHub CLI foi renovada por autorização de dispositivo.
 - [x] Segunda ativação por dispositivo do GitHub CLI concluída, iniciada sem abertura de navegador local, para disponibilizar a credencial ao terminal.
+- [x] Incluir `https://jocular-profiterole-c5dafc.netlify.app` nas URLs de redirecionamento de autenticação do projeto Supabase; configuração confirmada pelo usuário no painel Supabase.

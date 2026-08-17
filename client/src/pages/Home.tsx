@@ -270,6 +270,10 @@ function uniqueId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function isWonStage(stage: Stage) {
+  return stage.id === "won" || stage.id.endsWith("-won") || stage.name.trim().toLocaleLowerCase("pt-BR") === "ganho";
+}
+
 export default function Home() {
   const [page, setPage] = useState<Page>(() => new URLSearchParams(window.location.search).get("aba") === "funil" ? "pipeline" : "goals");
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -458,13 +462,16 @@ export default function Home() {
   }, [goals, funnels, deals, workspaceId, isCloudHydrating]);
 
   const activeFunnel = funnels.find((funnel) => funnel.id === activeFunnelId) ?? funnels[0];
-  const filteredDeals = useMemo(
+  const funnelDeals = useMemo(
     () => deals.filter((deal) => activeFunnel?.stages.some((stage) => stage.id === deal.stageId)),
     [activeFunnel, deals],
   );
+  const wonStage = activeFunnel?.stages.find(isWonStage);
+  const wonDeals = useMemo(() => funnelDeals.filter((deal) => deal.stageId === wonStage?.id), [funnelDeals, wonStage]);
+  const openDeals = useMemo(() => funnelDeals.filter((deal) => deal.stageId !== wonStage?.id), [funnelDeals, wonStage]);
 
-  const totalPipeline = filteredDeals.reduce((sum, deal) => sum + deal.value, 0);
-  const weightedPipeline = filteredDeals.reduce((sum, deal) => {
+  const totalPipeline = openDeals.reduce((sum, deal) => sum + deal.value, 0);
+  const weightedPipeline = openDeals.reduce((sum, deal) => {
     const stage = activeFunnel?.stages.find((item) => item.id === deal.stageId);
     return sum + deal.value * ((stage?.probability ?? 0) / 100);
   }, 0);
@@ -596,7 +603,7 @@ export default function Home() {
     setDraggedDealId(null);
     setOverStageId(null);
     const targetStage = activeFunnel?.stages.find((stage) => stage.id === stageId);
-    toast.success(`Oportunidade movida para ${targetStage?.name ?? "a etapa"}.`);
+    toast.success(targetStage?.name === "Ganho" ? "Oportunidade marcada como ganha." : `Oportunidade movida para ${targetStage?.name ?? "a etapa"}.`);
   }
 
   function startDrag(event: DragEvent<HTMLElement>, dealId: string) {
@@ -828,7 +835,9 @@ export default function Home() {
             funnels={funnels}
             activeFunnel={activeFunnel}
             activeFunnelId={activeFunnelId}
-            deals={filteredDeals}
+            deals={openDeals}
+            wonDeals={wonDeals}
+            wonStage={wonStage}
             totalPipeline={totalPipeline}
             weightedPipeline={weightedPipeline}
             draggedDealId={draggedDealId}
@@ -989,15 +998,20 @@ function GoalRow({ goal, onEdit, onDelete }: { goal: GoalItem; onEdit: () => voi
   return <div className="group grid gap-4 rounded-2xl border border-[#E7EBE6] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8D0] hover:shadow-[0_12px_28px_rgba(30,55,44,0.05)] sm:grid-cols-[auto_minmax(190px,1fr)_minmax(175px,0.6fr)_auto] sm:items-center"><div className="goal-meter" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div><div className="mb-1 flex flex-wrap items-center gap-2"><span className="tag-chip">{goal.type}</span><span className="text-xs text-[#88938E]">{goal.period}</span></div><h3 className="font-display text-base font-bold tracking-[-0.025em] text-[#27302D]">{goal.title}</h3></div><div><div className="mb-2 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#35403B]">{formatGoalValue(goal.actual, goal.unit)}</span><span className="text-xs font-medium text-[#7D8983]">de {formatGoalValue(goal.target, goal.unit)}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className={`h-full rounded-full ${styles[goal.color]}`} style={{ width: `${progress}%` }} /></div></div><div className="flex justify-end gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100"><button onClick={onEdit} className="icon-button" aria-label={`Editar ${goal.title}`}><Pencil size={15} /></button><button onClick={onDelete} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${goal.title}`}><Trash2 size={15} /></button></div></div>;
 }
 
-function PipelineWorkspace({ funnels, activeFunnel, activeFunnelId, deals, totalPipeline, weightedPipeline, draggedDealId, overStageId, onSelectFunnel, onNewFunnel, onEditFunnel, onNewDeal, onEditDeal, onNewStage, onEditStage, onDragStart, onDrop, onDragOver, onDragEnd }: { funnels: SalesFunnel[]; activeFunnel?: SalesFunnel; activeFunnelId: string; deals: Deal[]; totalPipeline: number; weightedPipeline: number; draggedDealId: string | null; overStageId: string | null; onSelectFunnel: (id: string) => void; onNewFunnel: () => void; onEditFunnel: () => void; onNewDeal: () => void; onEditDeal: (deal: Deal) => void; onNewStage: () => void; onEditStage: (stage: Stage) => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onDrop: (stageId: string) => void; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDragEnd: () => void }) {
+function PipelineWorkspace({ funnels, activeFunnel, activeFunnelId, deals, wonDeals, wonStage, totalPipeline, weightedPipeline, draggedDealId, overStageId, onSelectFunnel, onNewFunnel, onEditFunnel, onNewDeal, onEditDeal, onNewStage, onEditStage, onDragStart, onDrop, onDragOver, onDragEnd }: { funnels: SalesFunnel[]; activeFunnel?: SalesFunnel; activeFunnelId: string; deals: Deal[]; wonDeals: Deal[]; wonStage?: Stage; totalPipeline: number; weightedPipeline: number; draggedDealId: string | null; overStageId: string | null; onSelectFunnel: (id: string) => void; onNewFunnel: () => void; onEditFunnel: () => void; onNewDeal: () => void; onEditDeal: (deal: Deal) => void; onNewStage: () => void; onEditStage: (stage: Stage) => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onDrop: (stageId: string) => void; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDragEnd: () => void }) {
   if (!activeFunnel) return <div className="pipeline-shell grid min-h-screen place-items-center px-5 pt-[68px] md:pt-0"><div className="max-w-md text-center"><div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#E8F6F0] text-[#087E5A]"><GitBranch size={26} /></div><p className="eyebrow mt-6">Operação comercial</p><h1 className="page-title">Seu primeiro funil começa aqui</h1><p className="mt-3 text-sm leading-6 text-[#718079]">Crie etapas próprias para conduzir oportunidades, acompanhar valores e mover a receita com clareza.</p><Button onClick={onNewFunnel} className="mt-6 h-11 gap-2 rounded-xl bg-[#10A97A] px-5 font-bold hover:bg-[#087E5A]"><CirclePlus size={18} />Criar funil</Button></div></div>;
   return <div className="pipeline-shell pt-[68px] md:pt-0"><header className="border-b border-[#E2E7E1] bg-[#FBFBF9] px-5 py-5 md:px-10"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="eyebrow">Operação comercial</p><div className="flex items-center gap-2"><h1 className="page-title">Funil de vendas</h1><span className="hidden h-2 w-2 rounded-full bg-[#10A97A] sm:block" /></div></div><div className="flex items-center gap-2"><button className="icon-button hidden sm:grid" onClick={() => toast.info("Filtros avançados entram na próxima versão.")}><Filter size={17} /></button><button className="tool-button hidden sm:flex" onClick={() => toast.info("Visualizações serão salvas com sua conta.")}><SlidersHorizontal size={17} /><span>Visualização</span></button><Button onClick={onNewDeal} className="h-11 gap-2 rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A]"><Plus size={18} />Oportunidade</Button></div></div>
     <div className="mt-6 flex flex-wrap items-center gap-3"><div className="relative"><select aria-label="Selecionar funil" className="funnel-selector appearance-none" value={activeFunnelId} onChange={(event) => onSelectFunnel(event.target.value)}>{funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#77847E]" /></div><button onClick={onEditFunnel} className="icon-button" aria-label="Editar funil"><Pencil size={16} /></button><span className="hidden h-5 w-px bg-[#DDE4DE] sm:block" /><button onClick={onNewFunnel} className="hidden items-center gap-1.5 text-sm font-bold text-[#087E5A] sm:flex"><CirclePlus size={17} />Novo funil</button><div className="ml-0 flex gap-2 sm:ml-auto"><MiniMetric label="Em aberto" value={formatCurrency(totalPipeline)} /><MiniMetric label="Ponderado" value={formatCurrency(weightedPipeline)} accent /></div></div></header>
-    <div className="relative overflow-hidden px-5 py-7 md:px-10"><div className="pointer-events-none absolute right-8 top-2 hidden h-44 w-80 overflow-hidden rounded-full opacity-[0.13] xl:block"><img src={funnelArtUrl} alt="" className="h-full w-full object-cover" /></div><div className="relative z-10 overflow-x-auto pb-4"><div className="flex min-w-max items-stretch gap-4">{activeFunnel?.stages.map((stage) => <PipelineColumn key={stage.id} stage={stage} deals={deals.filter((deal) => deal.stageId === stage.id)} isOver={overStageId === stage.id} draggedDealId={draggedDealId} onEditStage={() => onEditStage(stage)} onEditDeal={onEditDeal} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd} />)}<button onClick={onNewStage} className="stage-add-button"><CirclePlus size={20} /><span>Nova etapa</span></button></div></div><div className="mt-3 flex items-center gap-2 text-xs text-[#728079]"><GripVertical size={15} /><span>Arraste as oportunidades entre as etapas para atualizar o funil.</span></div></div></div>;
+    <div className="relative overflow-hidden px-5 py-7 md:px-10"><div className="pointer-events-none absolute right-8 top-2 hidden h-44 w-80 overflow-hidden rounded-full opacity-[0.13] xl:block"><img src={funnelArtUrl} alt="" className="h-full w-full object-cover" /></div><div className="relative z-10 overflow-x-auto pb-4"><div className="flex min-w-max items-stretch gap-4">{activeFunnel?.stages.filter((stage) => !isWonStage(stage)).map((stage) => <PipelineColumn key={stage.id} stage={stage} deals={deals.filter((deal) => deal.stageId === stage.id)} isOver={overStageId === stage.id} draggedDealId={draggedDealId} onEditStage={() => onEditStage(stage)} onEditDeal={onEditDeal} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd} />)}<button onClick={onNewStage} className="stage-add-button"><CirclePlus size={20} /><span>Nova etapa</span></button></div></div>{wonStage && <WonDropzone stage={wonStage} deals={wonDeals} isOver={overStageId === wonStage.id} onDragOver={onDragOver} onDrop={onDrop} />}<div className="mt-3 flex items-center gap-2 text-xs text-[#728079]"><GripVertical size={15} /><span>Arraste oportunidades entre as etapas ou solte no rodapé para registrar o ganho.</span></div></div></div>;
 }
 
 function MiniMetric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return <div className={`rounded-xl border px-3 py-2 ${accent ? "border-[#BDE5D5] bg-[#E8F6F0]" : "border-[#E0E6E0] bg-white"}`}><p className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#7B8882]">{label}</p><p className={`mt-0.5 text-sm font-extrabold tracking-[-0.03em] ${accent ? "text-[#087E5A]" : "text-[#27302D]"}`}>{value}</p></div>;
+}
+
+function WonDropzone({ stage, deals, isOver, onDragOver, onDrop }: { stage: Stage; deals: Deal[]; isOver: boolean; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDrop: (stageId: string) => void }) {
+  const wonValue = deals.reduce((sum, deal) => sum + deal.value, 0);
+  return <section onDragOver={(event) => onDragOver(event, stage.id)} onDrop={() => onDrop(stage.id)} className={`won-dropzone ${isOver ? "won-dropzone-over" : ""}`} aria-label="Zona de ganho"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-white/15"><CircleDollarSign size={21} /></div><div><p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#BDEFD9]">Fechamento</p><h2 className="font-display text-lg font-extrabold tracking-[-0.035em]">Ganhar oportunidade</h2></div></div><div className="ml-auto flex items-center gap-6 text-right"><div><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#BDEFD9]">Concluídas</p><p className="mt-1 text-sm font-extrabold">{deals.length}</p></div><div><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#BDEFD9]">Receita ganha</p><p className="mt-1 text-sm font-extrabold">{formatCurrency(wonValue)}</p></div></div></section>;
 }
 
 function PipelineColumn({ stage, deals, isOver, draggedDealId, onEditStage, onEditDeal, onDragStart, onDragOver, onDrop, onDragEnd }: { stage: Stage; deals: Deal[]; isOver: boolean; draggedDealId: string | null; onEditStage: () => void; onEditDeal: (deal: Deal) => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDrop: (stageId: string) => void; onDragEnd: () => void }) {
