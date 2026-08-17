@@ -87,3 +87,5 @@ Os dados ficarão inicialmente no navegador por meio de armazenamento local. A c
 - Imagens abstratas atuam somente como atmosfera; instrumentos, metas, totais, status e próximos movimentos comerciais são a matéria visual dominante acima da dobra.
 - O **Verde Ritmo `#10A97A`** é reservado para avanço, status ativo, receita realizada e ações principais. Pontos de pulso, halos de progresso e faixas verticais de atividade devem se repetir como gramática visual do produto.
 - Números, percentuais e prazos devem seguir a hierarquia técnica de Manrope/DM Sans: labels compactos, valores instrumentais e baixa dependência de decoração.
+- Os totais do funil funcionam como instrumentos de leitura rápida: rótulos compactos, valores em Manrope e um ponto de pulso reservado ao pipeline ponderado.
+- As zonas de decisão de ganho e perda usam superfícies claras, bordas pontilhadas e cor apenas como sinal operacional; no arraste, a cor se intensifica para confirmar o destino sem competir com o quadro.

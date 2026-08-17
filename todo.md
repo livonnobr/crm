@@ -1,5 +1,8 @@
 # Publicação externa do Ritmo CRM
 
+- [ ] Conferir o deploy ativo do Netlify e republicar a versão correta, se necessário.
+- [x] Reduzir o espaço superior do funil e exibir zonas de decisão Ganho e Perdido durante o arraste.
+
 - [x] Implementar a barra lateral recolhível com expansão ao passar o mouse.
 - [x] Reduzir o cabeçalho do funil para priorizar o quadro de oportunidades.
 - [x] Ampliar o cadastro de oportunidades com atividades, observações e dados de empresa.
