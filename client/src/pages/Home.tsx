@@ -1696,7 +1696,7 @@ function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks:
   const beginEdit = (block: CadenceBlock) => setDraft({ ...block });
   const saveDraft = () => { if (draft?.title.trim()) { onEdit(draft); setDraft(null); } };
 
-  return <div className="min-h-screen bg-[#F6F5F1] px-4 pb-10 pt-7 md:px-8 md:pt-8">
+  return <div className="min-h-screen bg-[#F6F5F1] px-4 pb-10 pt-[84px] md:px-8 md:pt-8">
     <div className="mx-auto max-w-[1500px]">
       <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div><p className="eyebrow">Operação comercial</p><h1 className="font-display text-3xl font-extrabold tracking-[-0.06em] text-[#1B2522]">Cadência de prospecção</h1><p className="mt-1 max-w-xl text-sm font-medium text-[#77827C]">Desenhe a sequência de contatos por dia e turno. Arraste os blocos para reorganizar o ritmo.</p></div>

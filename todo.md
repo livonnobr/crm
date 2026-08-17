@@ -131,4 +131,5 @@
 - [x] Permitir criar, editar, mover e excluir blocos de atividade por arraste.
 - [x] Persistir a configuração da Cadência no Supabase e manter fallback local.
 - [x] Aplicar o padrão visual ivory, graphite e emerald do Ritmo CRM.
-- [ ] Validar responsividade e publicar a Cadência no GitHub e no Netlify.
+- [x] Validar responsividade e publicar a Cadência no GitHub e no Netlify.
+- [x] Validar a aba Cadência em viewport móvel/estreita e ajustar a grade se necessário.
