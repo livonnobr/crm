@@ -3,6 +3,9 @@
 - [ ] Conferir o deploy ativo do Netlify e republicar a versão correta, se necessário.
 - [x] Reduzir o espaço superior do funil e exibir zonas de decisão Ganho e Perdido durante o arraste.
 - [x] Ampliar o painel de detalhes da oportunidade para leitura e edição confortável em desktop.
+- [x] Unificar os controles e indicadores do cabeçalho do funil em uma única linha no desktop.
+- [x] Garantir a exibição de Ganho e Perdido como destinos ativos durante o arraste de um card.
+- [x] Ativar a aba Atividades com uma visão de tarefas comerciais do funil.
 
 - [x] Implementar a barra lateral recolhível com expansão ao passar o mouse.
 - [x] Reduzir o cabeçalho do funil para priorizar o quadro de oportunidades.

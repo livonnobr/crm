@@ -97,8 +97,8 @@
   .deal-card { @apply cursor-grab rounded-xl border border-[#E0E6E0] border-l-[3px] border-l-[#10A97A] bg-[#FCFCFA] p-3.5 shadow-[0_5px_13px_rgba(29,46,36,0.04)] transition duration-150 hover:-translate-y-0.5 hover:border-[#C4D3CB] hover:shadow-[0_12px_22px_rgba(29,46,36,0.08)] active:cursor-grabbing active:scale-[0.98]; }
   .deal-card-dragging { @apply rotate-[1deg] opacity-45 shadow-xl; }
   .outcome-dropzones { @apply mt-4 grid gap-3 sm:grid-cols-2; }
-  .outcome-dropzones-dragging { position: fixed; z-index: 30; bottom: 1rem; left: calc(var(--sidebar-width-icon) + 1rem); right: 1rem; margin-top: 0; animation: outcome-arrive 180ms cubic-bezier(0.23, 1, 0.32, 1) both; }
-  [data-sidebar-pinned="true"] .outcome-dropzones-dragging { left: calc(var(--sidebar-width) + 1rem); }
+  .outcome-dropzones-dragging, html.ritmo-dragging-deal .outcome-dropzones { position: fixed; z-index: 80; bottom: 1rem; left: calc(var(--sidebar-width-icon) + 1rem); right: 1rem; margin-top: 0; animation: outcome-arrive 180ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  [data-sidebar-pinned="true"] .outcome-dropzones-dragging, [data-sidebar-pinned="true"] html.ritmo-dragging-deal .outcome-dropzones { left: calc(var(--sidebar-width) + 1rem); }
   .outcome-dropzone { @apply flex min-h-[82px] items-center rounded-2xl border border-dashed px-4 py-3 shadow-[0_10px_26px_rgba(27,37,34,0.07)] transition duration-150 sm:px-5; }
   .outcome-dropzone-icon { @apply grid h-9 w-9 shrink-0 place-items-center rounded-xl; }
   .outcome-dropzone-won { @apply border-[#9EDCC4] bg-[#F0FAF5] text-[#087E5A]; }
@@ -124,5 +124,5 @@
 }
 
 @media (max-width: 767px) {
-  .outcome-dropzones-dragging { left: 1rem; right: 1rem; bottom: 1rem; }
+  .outcome-dropzones-dragging, html.ritmo-dragging-deal .outcome-dropzones { left: 1rem; right: 1rem; bottom: 1rem; }
 }
