@@ -86,7 +86,10 @@
 - [x] Adicionar periodicidade diária, semanal ou mensal ao cadastro de metas.
 - [x] Exibir no painel quantos dias faltam para o fim do mês.
 - [x] Publicar a melhoria de periodicidade e contagem regressiva no GitHub e no Netlify.
-- [ ] Permitir vincular metas a etapas e indicadores do funil.
-- [ ] Atualizar automaticamente o progresso ao movimentar oportunidades entre etapas.
-- [ ] Usar contagem acumulada: cada oportunidade soma uma vez ao entrar na etapa vinculada.
-- [ ] Validar e publicar a automação de metas e funil.
+- [x] Permitir vincular metas a etapas e indicadores do funil.
+- [x] Atualizar automaticamente o progresso ao movimentar oportunidades entre etapas.
+- [x] Usar contagem acumulada: cada oportunidade soma uma vez ao entrar na etapa vinculada.
+- [x] Validar e publicar a automação de metas e funil.
+- [x] Criar cadastro editável de taxas de conversão para cada etapa do funil.
+- [x] Adicionar simulador de leads com projeção automática das etapas seguintes.
+- [x] Validar e publicar o simulador de metas, incluindo persistência local e Supabase.

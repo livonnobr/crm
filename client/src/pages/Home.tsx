@@ -81,6 +81,7 @@ const PROSPECT_TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 type GoalType = "Prospecção" | "Vendas";
 type GoalUnit = "atividades" | "R$";
 type GoalCadence = "Diária" | "Semanal" | "Mensal";
+type ConversionRates = Record<string, number>;
 
 type GoalItem = {
   id: string;
@@ -163,6 +164,7 @@ type GoalRecord = {
   linked_stage_id?: string | null;
 };
 
+type ConversionSettingsRecord = { workspace_id: string; rates: ConversionRates };
 type FunnelRecord = { id: string; name: string; currency: string; position: number };
 type StageRecord = { id: string; funnel_id: string; name: string; color: string; probability: number; position: number };
 type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null;   notes?: DealNote[] | null; stage_history?: string[] | null };
@@ -400,6 +402,10 @@ function accumulatedStageCount(deals: Deal[], stageId: string) {
   return deals.filter((deal) => dealEnteredStage(deal, stageId)).length;
 }
 
+function defaultConversionRates(funnels: SalesFunnel[]): ConversionRates {
+  return Object.fromEntries(funnels.flatMap((funnel) => funnel.stages.map((stage, index) => [stage.id, index === 0 ? 100 : Math.min(100, Math.max(0, Number(stage.probability) || 0))])));
+}
+
 function recordStageVisit(deal: Deal, stageId: string): Deal {
   const history = deal.stageHistory?.length ? deal.stageHistory : [deal.stageId];
   return history.includes(stageId) ? { ...deal, stageId } : { ...deal, stageId, stageHistory: [...history, stageId] };
@@ -428,6 +434,7 @@ export default function Home() {
   const [isSidebarHovering, setIsSidebarHovering] = useState(false);
   const [goals, setGoals] = useState<GoalItem[]>(() => storedValue("ritmo-goals", initialGoals));
   const [funnels, setFunnels] = useState<SalesFunnel[]>(() => storedValue("ritmo-funnels", initialFunnels));
+  const [conversionRates, setConversionRates] = useState<ConversionRates>(() => storedValue("ritmo-conversion-rates", {}));
   const [deals, setDeals] = useState<Deal[]>(() => storedValue<Deal[]>("ritmo-deals", initialDeals).map((deal) => ({ ...deal, stageHistory: deal.stageHistory?.length ? deal.stageHistory : [deal.stageId] })));
   const [prospectLists, setProspectLists] = useState<ProspectList[]>(() => storedProspectLists());
   const [trashedProspectLists, setTrashedProspectLists] = useState<TrashedProspectList[]>(() => storedTrashedProspectLists());
@@ -487,12 +494,13 @@ export default function Home() {
       currentWorkspaceId = createdWorkspace.id as string;
     }
 
-    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }] = await Promise.all([
+    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }] = await Promise.all([
       client.from("goals").select("id, title, goal_type, target, actual, unit, period, color").eq("workspace_id", currentWorkspaceId).order("created_at", { ascending: false }),
       client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
+      client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
     ]);
 
-    if (goalsError || funnelsError) {
+    if (goalsError || funnelsError || conversionSettingsError) {
       toast.error("Não foi possível carregar os dados salvos.");
       setIsCloudLoading(false);
       setIsCloudHydrating(false);
@@ -556,6 +564,7 @@ export default function Home() {
 
     setGoals(normalizedGoals);
     setFunnels(normalizedFunnels);
+    setConversionRates({ ...defaultConversionRates(normalizedFunnels), ...((conversionSettingsRow as ConversionSettingsRecord | null)?.rates ?? {}) });
     setDeals(normalizedDeals);
     setActiveFunnelId(normalizedFunnels[0]?.id ?? "");
     setWorkspaceId(currentWorkspaceId);
@@ -600,6 +609,10 @@ export default function Home() {
   }, [funnels, workspaceId]);
 
   useEffect(() => {
+    if (!workspaceId) window.localStorage.setItem("ritmo-conversion-rates", JSON.stringify(conversionRates));
+  }, [conversionRates, workspaceId]);
+
+  useEffect(() => {
     if (!workspaceId) window.localStorage.setItem("ritmo-deals", JSON.stringify(deals));
   }, [deals, workspaceId]);
 
@@ -624,6 +637,7 @@ export default function Home() {
     const stageToFunnel = new Map(funnels.flatMap((funnel) => funnel.stages.map((stage) => [stage.id, funnel.id] as const)));
     const syncCloudState = async () => {
       if (goals.length) await client.from("goals").upsert(goals.map((goal) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color })));
+      await client.from("conversion_settings").upsert({ workspace_id: workspaceId, rates: conversionRates, updated_at: new Date().toISOString() });
       if (funnels.length) await client.from("funnels").upsert(funnels.map((funnel, position) => ({ id: funnel.id, workspace_id: workspaceId, name: funnel.name, currency: funnel.currency, position })));
       const stageRows = funnels.flatMap((funnel) => funnel.stages.map((stage, position) => ({ id: stage.id, funnel_id: funnel.id, name: stage.name, color: stage.color, probability: stage.probability, position })));
       if (stageRows.length) await client.from("stages").upsert(stageRows);
@@ -634,7 +648,7 @@ export default function Home() {
       if (opportunityRows.length) await client.from("opportunities").upsert(opportunityRows);
     };
     void syncCloudState();
-  }, [goals, funnels, deals, workspaceId, isCloudHydrating]);
+  }, [goals, funnels, deals, conversionRates, workspaceId, isCloudHydrating]);
 
   const activeFunnel = funnels.find((funnel) => funnel.id === activeFunnelId) ?? funnels[0];
   const funnelDeals = useMemo(
@@ -1157,6 +1171,8 @@ export default function Home() {
             onEditGoal={openEditGoal}
             onDeleteGoal={deleteGoal}
             funnels={funnels}
+            conversionRates={conversionRates}
+            onSaveConversionRates={(rates) => { setConversionRates(rates); toast.success("Taxas de conversão salvas."); }}
           />
         ) : page === "pipeline" ? (
           <PipelineWorkspace
@@ -1371,7 +1387,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
   );
 }
 
-function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal, onEditGoal, onDeleteGoal, funnels }: { goals: GoalItem[]; achievedRevenue: number; averageGoalProgress: number; onNewGoal: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; funnels: SalesFunnel[] }) {
+function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal, onEditGoal, onDeleteGoal, funnels, conversionRates, onSaveConversionRates }: { goals: GoalItem[]; achievedRevenue: number; averageGoalProgress: number; onNewGoal: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
   const daysRemaining = daysUntilMonthEnd();
   const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date());
   return (
@@ -1391,6 +1407,7 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
           {goals.length === 0 && <button onClick={onNewGoal} className="flex items-center gap-2 text-sm font-bold text-[#087E5A]"><CirclePlus size={18} />Criar primeiro instrumento</button>}
           <div className="instrument-cell"><div className="flex items-center gap-2"><span className="pulse-dot bg-[#D8952E]" /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#6F7D76]">Fechamento do mês</span></div><p className="mt-3 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#1B2522]">{daysRemaining} {daysRemaining === 1 ? "dia" : "dias"}</p><p className="mt-1 text-[11px] font-medium capitalize text-[#85918B]">restantes em {currentMonth}</p></div>
         </section>
+        <GoalSimulator funnels={funnels} conversionRates={conversionRates} onSaveConversionRates={onSaveConversionRates} />
         <section className="hero-panel mt-5 overflow-hidden">
           <img src={heroUrl} alt="Caminho abstrato em ascensão representando avanço comercial" className="absolute inset-0 h-full w-full object-cover opacity-75" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,30,27,0.96)_0%,rgba(18,30,27,0.86)_45%,rgba(18,30,27,0.28)_100%)]" />
@@ -1416,6 +1433,44 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
       </div>
     </div>
   );
+}
+
+function GoalSimulator({ funnels, conversionRates, onSaveConversionRates }: { funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
+  const [selectedFunnelId, setSelectedFunnelId] = useState(funnels[0]?.id ?? "");
+  const [leadInput, setLeadInput] = useState(120);
+  const [draftRates, setDraftRates] = useState<ConversionRates>(() => ({ ...defaultConversionRates(funnels), ...conversionRates }));
+  const activeFunnel = funnels.find((funnel) => funnel.id === selectedFunnelId) ?? funnels[0];
+
+  useEffect(() => {
+    setDraftRates({ ...defaultConversionRates(funnels), ...conversionRates });
+    if (!funnels.some((funnel) => funnel.id === selectedFunnelId)) setSelectedFunnelId(funnels[0]?.id ?? "");
+  }, [funnels, conversionRates, selectedFunnelId]);
+
+  if (!activeFunnel) return null;
+
+  const leads = Math.max(0, Number(leadInput) || 0);
+  let enteringStage = leads;
+  const projections = activeFunnel.stages.map((stage, index) => {
+    const rate = index === 0 ? 100 : Math.min(100, Math.max(0, Number(draftRates[stage.id] ?? stage.probability) || 0));
+    const projected = enteringStage;
+    enteringStage = projected * (rate / 100);
+    return { stage, rate, projected };
+  });
+  const finalProjection = projections.find(({ stage }) => isWonStage(stage))?.projected ?? projections.at(-1)?.projected ?? 0;
+  const numberFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+  const updateRate = (stageId: string, value: string) => setDraftRates((current) => ({ ...current, [stageId]: Math.min(100, Math.max(0, Number(value) || 0)) }));
+  const resetRates = () => setDraftRates(defaultConversionRates([activeFunnel]));
+
+  return <section className="surface-panel mt-5 overflow-hidden p-4 sm:p-6">
+    <div className="flex flex-col gap-4 border-b border-[#E8ECE6] pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><SlidersHorizontal size={16} /></span><p className="eyebrow">Planejamento de volume</p></div><h2 className="mt-2 section-title">Simulador de metas</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-[#718078]">Projete quantas oportunidades chegam a cada etapa a partir do seu volume de leads e das taxas reais do seu processo.</p></div>
+      <div className="flex flex-wrap items-end gap-3"><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Funil de referência</span><select className="form-select min-w-[190px]" value={activeFunnel.id} onChange={(event) => setSelectedFunnelId(event.target.value)}>{funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}</select></label><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Leads de entrada</span><Input min="0" type="number" value={leadInput} onChange={(event) => setLeadInput(Number(event.target.value))} className="h-10 w-[132px] bg-white font-bold" /></label></div>
+    </div>
+    <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+      <div><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-sm font-extrabold text-[#27302D]">Taxas de conversão</p><p className="mt-0.5 text-xs text-[#85918B]">A taxa indica quanto da etapa anterior avança para esta.</p></div><button type="button" onClick={resetRates} className="text-xs font-bold text-[#087E5A] hover:text-[#056448]">Usar taxas do funil</button></div><div className="space-y-2">{projections.map(({ stage, rate }, index) => <div key={stage.id} className="grid grid-cols-[minmax(0,1fr)_92px] items-center gap-3 rounded-xl border border-[#E7EBE6] bg-[#FCFCFA] px-3 py-2.5"><div className="flex min-w-0 items-center gap-2.5"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} /><div className="min-w-0"><p className="truncate text-sm font-bold text-[#35403B]">{stage.name}</p><p className="text-[11px] text-[#8A9690]">{index === 0 ? "Base do simulador" : "Avanço da etapa anterior"}</p></div></div><label className="relative"><span className="sr-only">Taxa para {stage.name}</span><Input min="0" max="100" step="0.1" type="number" value={rate} disabled={index === 0} onChange={(event) => updateRate(stage.id, event.target.value)} className="h-9 bg-white pr-7 text-right font-extrabold disabled:bg-[#F0F4F0] disabled:text-[#087E5A]" /><span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7C8A83]">%</span></label></div>)}</div><div className="mt-4 flex justify-end"><Button type="button" onClick={() => onSaveConversionRates(draftRates)} className="h-9 gap-2 rounded-xl bg-[#18201E] px-4 text-xs font-extrabold text-white hover:bg-[#087E5A]"><CheckCircle2 size={15} />Salvar taxas</Button></div></div>
+      <div className="rounded-2xl border border-[#D5E3DA] bg-[#F0F8F3] p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#5D7569]">Leitura projetada</p><p className="mt-1 text-sm font-bold text-[#27302D]">{activeFunnel.name}</p></div><span className="rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#087E5A]">{numberFormat.format(leads)} leads</span></div><div className="mt-4 space-y-2">{projections.map(({ stage, projected }, index) => <div key={stage.id} className="flex items-center gap-3"><div className="flex w-5 justify-center"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: stage.color }} /></div><p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#53665D]">{stage.name}</p><strong className="font-display text-lg tracking-[-0.04em] text-[#1B2522]">{numberFormat.format(projected)}</strong>{index < projections.length - 1 && <span className="sr-only">evolui para a próxima etapa</span>}</div>)}</div><div className="mt-5 border-t border-[#CFE0D5] pt-4"><p className="text-xs font-bold text-[#668074]">Fechamentos projetados em Ganho</p><p className="mt-1 font-display text-4xl font-extrabold tracking-[-0.07em] text-[#087E5A]">{numberFormat.format(finalProjection)}</p><p className="mt-1 text-xs leading-5 text-[#71887D]">Ajuste as taxas conforme os dados do seu histórico para tomar decisões de volume com mais precisão.</p></div></div>
+    </div>
+  </section>;
 }
 
 function GoalRow({ goal, funnels, onEdit, onDelete }: { goal: GoalItem; funnels: SalesFunnel[]; onEdit: () => void; onDelete: () => void }) {
