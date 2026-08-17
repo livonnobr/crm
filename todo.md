@@ -20,7 +20,7 @@
 - [x] Remover a coluna de etapa `Ganho` do quadro de funil.
 - [x] Criar uma zona de soltura `Ganhar oportunidade` no rodapé do funil.
 - [x] Publicar o ajuste no Netlify.
-- [ ] Sincronizar a versão atual na branch `ritmo-crm` do GitHub usando a credencial temporária já fornecida e confirmar o commit remoto.
+- [x] Sincronizar a versão atual na branch `ritmo-crm` do GitHub usando a credencial temporária já fornecida e confirmar o commit remoto.
 
 - [x] Criar e identificar o projeto Supabase para a persistência do CRM.
 - [x] Migrar o modelo de metas, funis, etapas e oportunidades para o Supabase.
