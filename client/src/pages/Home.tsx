@@ -65,6 +65,12 @@ type ProspectRecord = {
   analysis: string;
 };
 
+type ProspectList = {
+  id: string;
+  name: string;
+  records: ProspectRecord[];
+};
+
 type GoalType = "Prospecção" | "Vendas";
 type GoalUnit = "atividades" | "R$";
 
@@ -276,6 +282,15 @@ const blankGoal: GoalItem = {
 
 const initialProspects: ProspectRecord[] = [];
 
+const initialProspectLists: ProspectList[] = [{ id: "prospect-list-default", name: "Lista principal", records: initialProspects }];
+
+function storedProspectLists() {
+  const savedLists = storedValue<ProspectList[] | null>("ritmo-prospect-lists", null);
+  if (Array.isArray(savedLists) && savedLists.length) return savedLists;
+  const legacyRecords = storedValue<ProspectRecord[]>("ritmo-prospects", initialProspects);
+  return [{ id: "prospect-list-default", name: "Lista principal", records: legacyRecords }];
+}
+
 const blankProspect: ProspectRecord = {
   id: "",
   decisionMakerFirstName: "",
@@ -354,7 +369,8 @@ export default function Home() {
   const [goals, setGoals] = useState<GoalItem[]>(() => storedValue("ritmo-goals", initialGoals));
   const [funnels, setFunnels] = useState<SalesFunnel[]>(() => storedValue("ritmo-funnels", initialFunnels));
   const [deals, setDeals] = useState<Deal[]>(() => storedValue("ritmo-deals", initialDeals));
-  const [prospects, setProspects] = useState<ProspectRecord[]>(() => storedValue("ritmo-prospects", initialProspects));
+  const [prospectLists, setProspectLists] = useState<ProspectList[]>(() => storedProspectLists());
+  const [activeProspectListId, setActiveProspectListId] = useState(() => storedValue("ritmo-active-prospect-list", "prospect-list-default"));
   const [activeFunnelId, setActiveFunnelId] = useState(() => storedValue("ritmo-active-funnel", "primary-funnel"));
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
@@ -526,9 +542,15 @@ export default function Home() {
     if (!workspaceId) window.localStorage.setItem("ritmo-active-funnel", activeFunnelId);
   }, [activeFunnelId, workspaceId]);
 
+  const activeProspectList = prospectLists.find((list) => list.id === activeProspectListId) ?? prospectLists[0];
+  const prospects = activeProspectList?.records ?? [];
+
   useEffect(() => {
-    if (!workspaceId) window.localStorage.setItem("ritmo-prospects", JSON.stringify(prospects));
-  }, [prospects, workspaceId]);
+    if (!workspaceId) {
+      window.localStorage.setItem("ritmo-prospect-lists", JSON.stringify(prospectLists));
+      window.localStorage.setItem("ritmo-active-prospect-list", activeProspectListId);
+    }
+  }, [prospectLists, activeProspectListId, workspaceId]);
 
   useEffect(() => {
     if (!workspaceId || !supabase || isCloudHydrating) return;
@@ -579,17 +601,36 @@ export default function Home() {
   }
 
   function addProspect() {
-    setProspects((current) => [...current, { ...blankProspect, id: uniqueId("prospect") }]);
+    if (!activeProspectList) return;
+    setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, records: [...list.records, { ...blankProspect, id: uniqueId("prospect") }] } : list));
     toast.success("Nova linha adicionada à lista de prospecção.");
   }
 
   function updateProspect(id: string, field: keyof Omit<ProspectRecord, "id">, value: string) {
-    setProspects((current) => current.map((prospect) => (prospect.id === id ? { ...prospect, [field]: value } : prospect)));
+    if (!activeProspectList) return;
+    setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, records: list.records.map((prospect) => prospect.id === id ? { ...prospect, [field]: value } : prospect) } : list));
   }
 
   function deleteProspect(id: string) {
-    setProspects((current) => current.filter((prospect) => prospect.id !== id));
+    if (!activeProspectList) return;
+    setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, records: list.records.filter((prospect) => prospect.id !== id) } : list));
     toast.success("Contato removido da lista.");
+  }
+
+  function createProspectList() {
+    const nextList = { id: uniqueId("prospect-list"), name: `Nova lista ${prospectLists.length + 1}`, records: [] };
+    setProspectLists((current) => [...current, nextList]);
+    setActiveProspectListId(nextList.id);
+    toast.success("Nova lista criada.");
+  }
+
+  function renameProspectList(name: string) {
+    if (!activeProspectList || !name.trim()) return;
+    setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, name: name.trim() } : list));
+  }
+
+  function selectProspectList(id: string) {
+    setActiveProspectListId(id);
   }
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
@@ -1046,7 +1087,7 @@ export default function Home() {
         ) : page === "activities" ? (
           <ActivitiesWorkspace deals={openDeals} onToggleActivity={toggleWorkspaceActivity} onOpenDeal={openDealDetail} onNewDeal={openNewDeal} />
         ) : (
-          <ProspectingWorkspace prospects={prospects} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} />
+          <ProspectingWorkspace lists={prospectLists} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} />
         )}
       </main>
 
@@ -1280,7 +1321,7 @@ function ProspectingMetric({ label, value, detail, accent = false }: { label: st
   return <div className="rounded-2xl border border-[#DDE5DE] bg-[#FCFCFA] px-4 py-3 shadow-[0_8px_22px_rgba(43,61,53,0.04)]"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">{label}</span><span className={`h-1.5 w-1.5 rounded-full ${accent ? "bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.11)]" : "bg-[#A6B2AB]"}`} /></div><div className={`mt-2 font-display text-2xl font-extrabold tracking-[-0.05em] ${accent ? "text-[#087E5A]" : "text-[#27302D]"}`}>{value}</div><p className="mt-0.5 text-xs font-medium text-[#87938D]">{detail}</p></div>;
 }
 
-function ProspectingWorkspace({ prospects, onAdd, onUpdate, onDelete }: { prospects: ProspectRecord[]; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void }) {
+function ProspectingWorkspace({ lists, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onAdd, onUpdate, onDelete }: { lists: ProspectList[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void }) {
   const columns: Array<{ key: keyof Omit<ProspectRecord, "id">; label: string; width: string; multiline?: boolean }> = [
     { key: "decisionMakerFirstName", label: "Nome do decisor", width: "min-w-[170px]" },
     { key: "decisionMakerLastName", label: "Sobrenome do decisor", width: "min-w-[190px]" },
@@ -1300,6 +1341,9 @@ function ProspectingWorkspace({ prospects, onAdd, onUpdate, onDelete }: { prospe
         <div><p className="eyebrow">Prospecção comercial</p><div className="mt-1 flex items-center gap-2"><h1 className="page-title">Lista de Prospecção</h1><span className="h-2 w-2 rounded-full bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.12)]" /></div><p className="mt-2 text-sm text-[#728079]">Organize decisores, empresas e hipóteses de abordagem em uma única mesa de trabalho.</p></div>
         <Button onClick={onAdd} className="h-10 gap-2 self-start rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A] sm:self-auto"><Plus size={18} />Nova linha</Button>
       </header>
+      <section className="mt-5 flex flex-col gap-3 rounded-2xl border border-[#DDE5DE] bg-[#FCFCFA] p-3 shadow-[0_8px_22px_rgba(43,61,53,0.04)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={18} /></div><div className="min-w-0"><label htmlFor="prospect-list-select" className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="mt-0.5 block max-w-[250px] truncate border-0 bg-transparent p-0 pr-8 font-display text-base font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select></div></div><div className="flex flex-wrap items-center gap-2"><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} onBlur={(event) => onRenameList(event.target.value)} className="h-9 w-[190px] rounded-lg border border-[#DDE5DE] bg-white px-3 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-9 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={15} />Nova lista</Button></div>
+      </section>
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <ProspectingMetric label="Contatos na bancada" value={prospects.length.toString()} detail="linhas de prospecção" />
         <ProspectingMetric label="Com canal de contato" value={contactableCount.toString()} detail="e-mail ou telefone preenchido" accent />
