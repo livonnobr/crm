@@ -57,7 +57,13 @@
 - [ ] Implementar e publicar a aba Análise no GitHub e no Netlify.
 - [ ] Implementar a aba Lista de Prospecção em formato de planilha editável.
 - [ ] Adicionar campos de decisor, contato, empresa, site e análise comercial.
-- [ ] Suportar múltiplas listas de prospecção com nomes e registros independentes.
-- [ ] Implementar criar, editar, salvar e alternar listas.
+- [x] Suportar múltiplas listas de prospecção com nomes e registros independentes.
+- [x] Implementar criar, editar, salvar e alternar listas.
 - [x] Após a reconexão, validar a sessão do GitHub e enviar o branch `ritmo-crm`.
 - [x] Confirmar no remoto que o commit mais recente contém a versão publicada no Netlify.
+- [x] Sincronizar a melhoria de múltiplas listas no GitHub, commit `33159175`.
+- [x] Confirmar o novo upload da melhoria no Netlify; pacote preparado, painel indisponível durante a tentativa — substituído por deploy direto confirmado.
+- [x] Reexecutar o deploy da versão de múltiplas listas no Netlify pela conexão existente.
+- [x] Validar a conexão direta do projeto ao Netlify e publicar a versão atual.
+- [ ] Corrigir o campo de nome da lista para aceitar espaços e permitir valor vazio durante a edição.
+- [ ] Republicar a correção no GitHub e no Netlify.

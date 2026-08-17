@@ -625,8 +625,9 @@ export default function Home() {
   }
 
   function renameProspectList(name: string) {
-    if (!activeProspectList || !name.trim()) return;
-    setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, name: name.trim() } : list));
+    if (!activeProspectList) return;
+    // Preserve the raw input while typing: spaces and an intentionally empty name are valid edit states.
+    setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, name } : list));
   }
 
   function selectProspectList(id: string) {
@@ -1342,7 +1343,7 @@ function ProspectingWorkspace({ lists, activeListId, activeListName, prospects, 
         <Button onClick={onAdd} className="h-10 gap-2 self-start rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A] sm:self-auto"><Plus size={18} />Nova linha</Button>
       </header>
       <section className="mt-5 flex flex-col gap-3 rounded-2xl border border-[#DDE5DE] bg-[#FCFCFA] p-3 shadow-[0_8px_22px_rgba(43,61,53,0.04)] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={18} /></div><div className="min-w-0"><label htmlFor="prospect-list-select" className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="mt-0.5 block max-w-[250px] truncate border-0 bg-transparent p-0 pr-8 font-display text-base font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select></div></div><div className="flex flex-wrap items-center gap-2"><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} onBlur={(event) => onRenameList(event.target.value)} className="h-9 w-[190px] rounded-lg border border-[#DDE5DE] bg-white px-3 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-9 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={15} />Nova lista</Button></div>
+        <div className="flex min-w-0 items-center gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={18} /></div><div className="min-w-0"><label htmlFor="prospect-list-select" className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7B8882]">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="mt-0.5 block max-w-[250px] truncate border-0 bg-transparent p-0 pr-8 font-display text-base font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select></div></div><div className="flex flex-wrap items-center gap-2"><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} className="h-9 w-[190px] rounded-lg border border-[#DDE5DE] bg-white px-3 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-9 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={15} />Nova lista</Button></div>
       </section>
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <ProspectingMetric label="Contatos na bancada" value={prospects.length.toString()} detail="linhas de prospecção" />

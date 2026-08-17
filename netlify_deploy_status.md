@@ -16,3 +16,12 @@ Fonte consultada: https://app.netlify.com/projects/jocular-profiterole-c5dafc/de
 - **Commit:** `cf32dace` — adiciona a aba Lista de Prospecção, grade editável, persistência local, métricas de cockpit e responsividade.
 - **Netlify:** novo pacote preparado em `/home/ubuntu/ritmo-crm-netlify-prospecting.zip`; o painel ficou indisponível durante a tentativa final de upload, portanto o novo deploy externo ainda não foi confirmado.
 - **URL pública atual:** https://jocular-profiterole-c5dafc.netlify.app/
+
+## Atualização — Múltiplas listas de prospecção
+
+- **GitHub:** branch `ritmo-crm` sincronizado com sucesso.
+- **Commit:** `33159175` — múltiplas listas nomeadas, seleção, renomeação e persistência separada.
+- **Netlify:** deploy direto confirmado pelo conector no site `54eea3a3-8519-4192-9321-84aa4375b29f`.
+- **Deploy:** `6a836ef9e2665a23cd485922`, estado `ready`, publicado em 17/08/2026 às 20:28:50 UTC, com 4 arquivos novos e 1 regra de redirecionamento processada.
+- **URL pública:** https://jocular-profiterole-c5dafc.netlify.app/
+- **Preview do deploy:** https://6a836ef9e2665a23cd485922--jocular-profiterole-c5dafc.netlify.app
