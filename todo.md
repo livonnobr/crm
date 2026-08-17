@@ -79,5 +79,7 @@
 - [x] Validar e republicar a ordenação dos novos contatos.
 - [x] Usar o padrão `Lista - Mês - Sem N` ao criar novas listas de prospecção.
 - [x] Validar e republicar o novo padrão de nomes.
-- [ ] Remover os indicadores de contatos, canais e análises da Lista de Prospecção.
-- [ ] Exibir apenas o contador de empresas preenchidas e republicar.
+- [x] Remover os indicadores de contatos, canais e análises da Lista de Prospecção.
+- [x] Exibir apenas o contador de empresas preenchidas e republicar.
+- [ ] Compactar título, lista ativa e ações da Lista de Prospecção em uma linha.
+- [ ] Validar responsividade e republicar o cabeçalho compacto.
