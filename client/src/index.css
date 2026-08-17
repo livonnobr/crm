@@ -1,3 +1,7 @@
+/**
+ * Oficina de Receita — tokens e superfícies do CRM Ritmo.
+ * Design: minimalismo tátil contemporâneo; marfim frio, grafite e Verde Ritmo #10A97A.
+ */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -27,151 +31,67 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 :root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.235 0.015 65);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.015 65);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.015 65);
-  --secondary: oklch(0.98 0.001 286.375);
-  --secondary-foreground: oklch(0.4 0.015 65);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.141 0.005 285.823);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.235 0.015 65);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
-}
-
-.dark {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-500);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.85 0.005 65);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.85 0.005 65);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.85 0.005 65);
-  --secondary: oklch(0.24 0.006 286.033);
-  --secondary-foreground: oklch(0.7 0.005 65);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground:  oklch(0.92 0.005 65);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.488 0.243 264.376);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.85 0.005 65);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground:  oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.488 0.243 264.376);
+  --primary: #10A97A;
+  --primary-foreground: #f7fffb;
+  --secondary: #eef2ee;
+  --secondary-foreground: #35403B;
+  --muted: #edf0ec;
+  --muted-foreground: #718079;
+  --accent: #e8f6f0;
+  --accent-foreground: #087e5a;
+  --destructive: #c55a52;
+  --destructive-foreground: #fffafa;
+  --radius: 0.8rem;
+  --background: #F6F5F1;
+  --foreground: #1B2522;
+  --card: #FCFCFA;
+  --card-foreground: #1B2522;
+  --popover: #FCFCFA;
+  --popover-foreground: #1B2522;
+  --border: #e1e7e1;
+  --input: #dce4dc;
+  --ring: #10A97A;
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  button:not(:disabled),
-  [role="button"]:not([aria-disabled="true"]),
-  [type="button"]:not(:disabled),
-  [type="submit"]:not(:disabled),
-  [type="reset"]:not(:disabled),
-  a[href],
-  select:not(:disabled),
-  input[type="checkbox"]:not(:disabled),
-  input[type="radio"]:not(:disabled) {
-    @apply cursor-pointer;
-  }
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; text-rendering: optimizeLegibility; }
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [type="button"]:not(:disabled), [type="submit"]:not(:disabled), [type="reset"]:not(:disabled), a[href], select:not(:disabled), input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled) { @apply cursor-pointer; }
 }
 
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
-  .container {
-    width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
-    padding-right: 1rem;
-  }
+  .font-display { font-family: "Manrope", "DM Sans", ui-sans-serif, sans-serif; }
+  .eyebrow { @apply text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#7B8882]; }
+  .page-title { @apply mt-1 text-[30px] font-extrabold tracking-[-0.06em] text-[#17201E] sm:text-[34px]; font-family: "Manrope", "DM Sans", ui-sans-serif, sans-serif; }
+  .section-title { @apply mt-1 text-xl font-extrabold tracking-[-0.045em] text-[#27302D]; font-family: "Manrope", "DM Sans", ui-sans-serif, sans-serif; }
+  .sidebar-link { @apply flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold text-[#63706B] transition duration-150 hover:bg-[#F0F3EF] hover:text-[#27302D] active:scale-[0.98]; }
+  .sidebar-link-active { @apply bg-[#E8F6F0] text-[#087E5A] shadow-[inset_0_0_0_1px_rgba(16,169,122,0.06)]; }
+  .tool-button { @apply flex h-10 items-center gap-2 rounded-xl border border-[#E1E7E1] bg-white px-3 text-sm font-bold text-[#55635D] transition hover:border-[#BFD3C8] hover:text-[#087E5A] active:scale-[0.98]; }
+  .icon-button { @apply grid h-8 w-8 place-items-center rounded-lg text-[#77847E] transition hover:bg-[#EDF2EE] hover:text-[#087E5A] active:scale-[0.95]; }
+  .surface-panel { @apply rounded-3xl border border-[#E1E7E1] bg-[#FCFCFA] shadow-[0_14px_36px_rgba(35,54,43,0.035)]; }
+  .hero-panel { @apply relative min-h-[232px] rounded-3xl bg-[#17201E] shadow-[0_18px_45px_rgba(22,37,31,0.12)]; }
+  .instrument-strip { @apply relative grid gap-0 overflow-hidden rounded-2xl border border-[#DCE5DE] bg-[#FBFCF9] shadow-[0_10px_30px_rgba(35,54,43,0.025)] md:grid-cols-3; }
+  .instrument-cell { @apply relative min-w-0 px-5 py-4 sm:px-6; }
+  .instrument-divider { @apply absolute bottom-5 right-0 top-5 hidden w-px bg-[#E0E7E0] md:block; }
+  .tag-chip { @apply inline-flex items-center rounded-md bg-[#E8F6F0] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#087E5A]; }
+  .form-select { @apply flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm font-medium outline-none transition focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15; }
+  .funnel-selector { @apply h-10 rounded-xl border border-[#DCE4DC] bg-white py-2 pl-3 pr-9 text-sm font-extrabold text-[#27302D] outline-none transition focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15; }
+  .pipeline-shell { @apply min-h-screen bg-[#F4F5F2]; }
+  .pipeline-column { @apply w-[260px] rounded-2xl border border-[#E0E6E0] bg-[#EDF1ED]/75 p-3 transition duration-150; }
+  .pipeline-column-over { @apply border-[#10A97A] bg-[#E6F5EE] shadow-[inset_0_0_0_1px_rgba(16,169,122,0.1)]; }
+  .stage-add-button { @apply flex min-h-[120px] w-[170px] items-center justify-center gap-2 self-start rounded-2xl border border-dashed border-[#C9D5CD] bg-[#FAFBF9]/70 px-5 text-sm font-bold text-[#63706B] transition hover:border-[#10A97A] hover:bg-[#E8F6F0] hover:text-[#087E5A] active:scale-[0.98]; }
+  .deal-card { @apply cursor-grab rounded-xl border border-[#E0E6E0] border-l-[3px] border-l-[#10A97A] bg-[#FCFCFA] p-3.5 shadow-[0_5px_13px_rgba(29,46,36,0.04)] transition duration-150 hover:-translate-y-0.5 hover:border-[#C4D3CB] hover:shadow-[0_12px_22px_rgba(29,46,36,0.08)] active:cursor-grabbing active:scale-[0.98]; }
+  .deal-card-dragging { @apply rotate-[1deg] opacity-45 shadow-xl; }
+  .goal-meter { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(#10A97A var(--progress), #E8ECE7 0); position: relative; }
+  .goal-meter::before { content: ""; position: absolute; inset: 5px; border-radius: 9999px; background: #FCFCFA; }
+  .goal-meter span { position: relative; z-index: 1; font-size: 10px; font-weight: 800; color: #087E5A; }
+  .pulse-dot { @apply h-2 w-2 rounded-full bg-[#8DE2C4] shadow-[0_0_0_4px_rgba(141,226,196,0.13)]; }
+}
 
-  .flex {
-    min-height: 0;
-    min-width: 0;
-  }
-
-  @media (min-width: 640px) {
-    .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
-      padding-right: 1.5rem;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .container {
-      padding-left: 2rem; /* 32px - desktop padding */
-      padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
-    }
-  }
+@media (prefers-reduced-motion: no-preference) {
+  .surface-panel, .hero-panel, .pipeline-column, .deal-card, .stage-add-button { animation: rise-in 360ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
 }
