@@ -70,5 +70,8 @@
 - [x] Adicionar exclusão de listas com confirmação e retenção de 30 dias na Lixeira.
 - [x] Implementar restauração e exclusão definitiva de listas na Lixeira.
 - [x] Publicar a melhoria da Lixeira no GitHub e no Netlify.
-- [ ] Adicionar exportação da lista ativa em CSV e Excel (.xlsx).
-- [ ] Documentar que o salvamento atual é automático no navegador, sem sincronização entre dispositivos.
+- [x] Adicionar exportação da lista ativa em CSV e Excel compatível (.xls).
+- [x] Documentar que o salvamento atual é automático no navegador, sem sincronização entre dispositivos.
+- [ ] Aumentar a altura da área de edição da coluna Análise.
+- [ ] Configurar Ctrl+Enter para inserir uma linha em branco na Análise.
+- [ ] Republicar a melhoria no GitHub e no Netlify.
