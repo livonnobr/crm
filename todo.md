@@ -333,3 +333,7 @@
 - [x] Publicar a versão atual do Ritmo no projeto oficial dentro do time CRZAP, associado a crm-sage-ten-98.vercel.app; a URL crm-sage-ten-98 foi tratada como origem legada e o projeto oficial ativo confirmado é crm-lemon-seven-15
 
 - [x] Transferir com segurança os dados reais de crm-sage-ten-98.vercel.app para crm-lemon-seven-15.vercel.app e conectar o destino ao branch ritmo-crm; a comparação confirmou que ambos já exibem os mesmos dados persistidos e o destino está ligado a livonnobr/crm
+
+- [x] Verificar se o lead cadastrado em Empresas está persistido no Supabase e associado ao workspace correto; consulta confirmou 0 registros em prospect_records
+
+- [x] Exibir estado de autenticação e confirmação explícita na aba Empresas quando o lead ainda estiver apenas no armazenamento local
