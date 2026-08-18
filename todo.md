@@ -320,3 +320,5 @@
 - [x] Permitir personalizar uma meta recorrente apenas no mês selecionado, preservando a regra recorrente nos demais meses e persistindo a exceção
 
 - [x] Antes de continuar o Financeiro, sincronizar todas as modificações locais pendentes com GitHub e Vercel e confirmar o deploy de produção
+
+- [x] Reorganizar o card Fechamento do mês para deixar o título menor acima do calendário, evitar sobreposição e reforçar o contraste da grade
