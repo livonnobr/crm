@@ -35,6 +35,10 @@ function mapGoalReference(value: unknown, namespace: string) {
   return entityUuid(value, namespace);
 }
 
+function normalizeSimulationProjectionMode(value: unknown) {
+  return value === "fixo" || value === "produto" ? value : "percentual";
+}
+
 function getAdminClient() {
   if (adminClient) return adminClient;
   if (!ENV.supabaseUrl || !ENV.supabaseServiceRoleKey) {
@@ -151,7 +155,7 @@ export async function getWorkspaceSnapshot(workspaceId: string) {
     supabase.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
     supabase.from("finance_entries").select("id, workspace_id, expense, amount, installment, due_date, notes, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
     supabase.from("services").select("id, workspace_id, name, deliverables, deadline, deadline_unit, price, pricing_type, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
-    supabase.from("goal_simulation_stages").select("id, workspace_id, name, color, probability, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
+    supabase.from("goal_simulation_stages").select("id, workspace_id, name, color, probability, projection_mode, fixed_value, product_id, conversion_stage_id, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
   ]);
   const error = goalsError ?? funnelsError ?? conversionError ?? prospectListsError ?? prospectRecordsError ?? cadenceError ?? financeError ?? servicesError ?? goalSimulationStagesError;
   if (error) throw error;
@@ -228,6 +232,10 @@ export async function syncGoalsWorkspace(workspaceId: string, goals: any[], goal
     name: String(stage.name ?? "Nova etapa").trim() || "Nova etapa",
     color: stage.color,
     probability: Math.min(100, Math.max(0, Number(stage.probability) || 0)),
+    projection_mode: normalizeSimulationProjectionMode(stage.projectionMode),
+    fixed_value: Math.max(0, Number(stage.fixedValue) || 0),
+    product_id: stage.productId ? entityUuid(stage.productId, "service") : null,
+    conversion_stage_id: stage.conversionStageId ? entityUuid(stage.conversionStageId, "stage") : null,
     position,
     updated_at: new Date().toISOString(),
   }));
@@ -263,7 +271,7 @@ export async function syncWorkspaceSnapshot(workspaceId: string, state: any) {
   if (conversionError) throw conversionError;
   const { data: existingGoalSimulationStages, error: goalSimulationStagesReadError } = await supabase.from("goal_simulation_stages").select("id").eq("workspace_id", workspaceId);
   if (goalSimulationStagesReadError) throw goalSimulationStagesReadError;
-  const goalSimulationStageRows = goalSimulationStages.map((stage: any, position: number) => ({ id: entityUuid(stage.id, "goal-simulation-stage"), workspace_id: workspaceId, name: stage.name, color: stage.color, probability: Math.min(100, Math.max(0, Number(stage.probability) || 0)), position, updated_at: new Date().toISOString() }));
+  const goalSimulationStageRows = goalSimulationStages.map((stage: any, position: number) => ({ id: entityUuid(stage.id, "goal-simulation-stage"), workspace_id: workspaceId, name: stage.name, color: stage.color, probability: Math.min(100, Math.max(0, Number(stage.probability) || 0)), projection_mode: normalizeSimulationProjectionMode(stage.projectionMode), fixed_value: Math.max(0, Number(stage.fixedValue) || 0), product_id: stage.productId ? entityUuid(stage.productId, "service") : null, conversion_stage_id: stage.conversionStageId ? entityUuid(stage.conversionStageId, "stage") : null, position, updated_at: new Date().toISOString() }));
   const goalSimulationStageIds = goalSimulationStageRows.map((row: any) => row.id);
   const staleGoalSimulationStages = (existingGoalSimulationStages ?? []).map((row: any) => row.id).filter((id: string) => !goalSimulationStageIds.includes(id));
   if (staleGoalSimulationStages.length) { const result = await supabase.from("goal_simulation_stages").delete().in("id", staleGoalSimulationStages); if (result.error) throw result.error; }
