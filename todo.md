@@ -271,3 +271,7 @@
 
 - [x] Remover Perdido do simulador e deixar Ganho como última linha.
 - [x] Arredondar as projeções do simulador para números inteiros e validar testes, build e publicação.
+
+- [ ] Verificar se a correção do simulador está na branch GitHub `ritmo-crm`.
+- [ ] Enviar o commit validado ao GitHub caso esteja ausente.
+- [ ] Confirmar ou disparar o deploy correspondente na Vercel `/crm`.
