@@ -268,3 +268,6 @@
 
 - [x] Separar visualmente cada meta em um quadrado independente lado a lado, removendo o contêiner retangular único.
 - [x] Validar edição, reordenação, responsividade, testes, build e publicação do novo layout.
+
+- [x] Remover Perdido do simulador e deixar Ganho como última linha.
+- [x] Arredondar as projeções do simulador para números inteiros e validar testes, build e publicação.

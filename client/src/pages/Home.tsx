@@ -1729,15 +1729,16 @@ function GoalSimulator({ funnels, conversionRates, onSaveConversionRates }: { fu
   if (!activeFunnel) return null;
 
   const leads = Math.max(0, Number(leadInput) || 0);
+  const simulatorStages = activeFunnel.stages.filter((stage) => !isLostStage(stage)).sort((left, right) => Number(isWonStage(left)) - Number(isWonStage(right)));
   let enteringStage = leads;
-  const projections = activeFunnel.stages.map((stage, index) => {
+  const projections = simulatorStages.map((stage, index) => {
     const rate = index === 0 ? 100 : Math.min(100, Math.max(0, Number(draftRates[stage.id] ?? stage.probability) || 0));
     const projected = index === 0 ? enteringStage : enteringStage * (rate / 100);
     enteringStage = projected;
     return { stage, rate, projected };
   });
   const finalProjection = projections.find(({ stage }) => isWonStage(stage))?.projected ?? projections.at(-1)?.projected ?? 0;
-  const numberFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+  const numberFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
   const updateRate = (stageId: string, value: string) => setDraftRates((current) => ({ ...current, [stageId]: Math.min(100, Math.max(0, Number(value) || 0)) }));
   const resetRates = () => setDraftRates(defaultConversionRates([activeFunnel]));
 
