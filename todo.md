@@ -243,3 +243,6 @@
 
 - [x] Corrigir a navegação da aba Pessoas, que atualmente abre Empresas.
 - [x] Validar o destino correto, testes, build e publicação da correção de navegação.
+
+- [x] Adicionar ícones grandes e expressivos aos blocos da Cadência conforme canal e ação.
+- [x] Validar responsividade, testes, build e publicação do refinamento visual da Cadência.
