@@ -305,3 +305,8 @@
 - [x] Aumentar o número e os textos do card Fechamento do mês
 - [x] Remover o banner visual Cadência saudável da interface
 - [x] Remover o cartão visual Receita realizada / Meta em vendas da interface
+- [ ] Adicionar seletor mensal ao painel de Metas
+- [ ] Contabilizar negócios e avanços somente no mês do evento da etapa
+- [ ] Persistir histórico mensal de etapas no Supabase e validar o filtro
+
+- [x] Adicionar seletor mensal no painel de Metas e contabilizar negócios por eventos de etapa ocorridos no mês selecionado, sem reaparecer em meses posteriores

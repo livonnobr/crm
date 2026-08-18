@@ -189,11 +189,14 @@ type CompanyData = {
   website?: string;
   city?: string;
   __ritmoStageHistory?: string[];
+  __ritmoStageEvents?: StageEvent[];
   __ritmoProspectId?: string;
   __ritmoProspectListId?: string;
   monthlyVisits?: string;
   analysis?: string;
 };
+
+type StageEvent = { stageId: string; occurredAt: string };
 
 type Deal = {
   id: string;
@@ -212,6 +215,7 @@ type Deal = {
   activities?: DealActivity[];
   notes?: DealNote[];
   stageHistory?: string[];
+  stageEvents?: StageEvent[];
 };
 
 type GoalRecord = {
@@ -234,7 +238,7 @@ type ProspectListRow = { id: string; workspace_id: string; name: string; deleted
 type ProspectRecordRow = { id: string; list_id: string; decision_maker_first_name: string; decision_maker_last_name: string; decision_maker_role: string | null; decision_maker_email: string; decision_maker_phone: string; decision_maker_secondary_phone?: string | null; monthly_visits?: string | null; company: string; company_website: string; analysis: string; position: number };
 type FunnelRecord = { id: string; name: string; currency: string; position: number };
 type StageRecord = { id: string; funnel_id: string; name: string; color: string; probability: number; position: number };
-type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null;   notes?: DealNote[] | null; stage_history?: string[] | null };
+type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null; notes?: DealNote[] | null; stage_history?: string[] | null };
 
 const logoUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/XzvVLbbQIKNxqUWR.png";
 const funnelArtUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/RSAFUTacmmjjoCvV.jpg";
@@ -473,12 +477,31 @@ function progressOf(goal: GoalItem) {
   return Math.min(100, Math.round((goal.actual / Math.max(goal.target, 1)) * 100));
 }
 
+const LEGACY_STAGE_EVENT_DATE = new Date().toISOString();
+
+function stageEventsForDeal(deal: Deal): StageEvent[] {
+  if (deal.stageEvents?.length) return deal.stageEvents;
+  const history = deal.stageHistory?.length ? deal.stageHistory : [deal.stageId];
+  return history.map((stageId) => ({ stageId, occurredAt: LEGACY_STAGE_EVENT_DATE }));
+}
+
 function dealEnteredStage(deal: Deal, stageId: string) {
   return (deal.stageHistory?.length ? deal.stageHistory : [deal.stageId]).includes(stageId);
 }
 
-function accumulatedStageCount(deals: Deal[], stageId: string) {
-  return deals.filter((deal) => dealEnteredStage(deal, stageId)).length;
+function accumulatedStageCount(deals: Deal[], stageId: string, monthKey: string) {
+  return deals.filter((deal) => stageEventsForDeal(deal).some((event) => event.stageId === stageId && event.occurredAt.slice(0, 7) === monthKey)).length;
+}
+
+function goalMatchesMonth(goal: GoalItem, monthKey: string) {
+  if (goal.recurring) return true;
+  const rawPeriod = goal.period.replace(/^(Diária|Semanal|Mensal)\s*[·|-]\s*/i, "").trim().toLocaleLowerCase("pt-BR");
+  const isoMatch = rawPeriod.match(/^(\d{4})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}` === monthKey;
+  const localizedMatch = rawPeriod.match(/^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(\d{4})$/i);
+  if (!localizedMatch) return true;
+  const monthNumber = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"].indexOf(localizedMatch[1]) + 1;
+  return `${localizedMatch[2]}-${String(monthNumber).padStart(2, "0")}` === monthKey;
 }
 
 function defaultConversionRates(funnels: SalesFunnel[]): ConversionRates {
@@ -487,7 +510,9 @@ function defaultConversionRates(funnels: SalesFunnel[]): ConversionRates {
 
 function recordStageVisit(deal: Deal, stageId: string): Deal {
   const history = deal.stageHistory?.length ? deal.stageHistory : [deal.stageId];
-  return history.includes(stageId) ? { ...deal, stageId } : { ...deal, stageId, stageHistory: [...history, stageId] };
+  const events = stageEventsForDeal(deal);
+  if (history.includes(stageId)) return { ...deal, stageId, stageEvents: events };
+  return { ...deal, stageId, stageHistory: [...history, stageId], stageEvents: [...events, { stageId, occurredAt: new Date().toISOString() }] };
 }
 
 function uniqueId(prefix: string) {
@@ -519,9 +544,10 @@ export default function Home() {
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [isSidebarHovering, setIsSidebarHovering] = useState(false);
   const [goals, setGoals] = useState<GoalItem[]>(() => storedValue("ritmo-goals", initialGoals));
+  const [selectedGoalMonth, setSelectedGoalMonth] = useState(() => periodValueForDate("Mensal"));
   const [funnels, setFunnels] = useState<SalesFunnel[]>(() => storedValue("ritmo-funnels", initialFunnels));
   const [conversionRates, setConversionRates] = useState<ConversionRates>(() => storedValue("ritmo-conversion-rates", {}));
-  const [deals, setDeals] = useState<Deal[]>(() => storedValue<Deal[]>("ritmo-deals", initialDeals).map((deal) => ({ ...deal, stageHistory: deal.stageHistory?.length ? deal.stageHistory : [deal.stageId] })));
+  const [deals, setDeals] = useState<Deal[]>(() => storedValue<Deal[]>("ritmo-deals", initialDeals).map((deal) => ({ ...deal, stageHistory: deal.stageHistory?.length ? deal.stageHistory : [deal.stageId], stageEvents: stageEventsForDeal(deal) })));
   const [prospectLists, setProspectLists] = useState<ProspectList[]>(() => storedProspectLists());
   const [trashedProspectLists, setTrashedProspectLists] = useState<TrashedProspectList[]>(() => storedTrashedProspectLists());
   const [cadenceBlocks, setCadenceBlocks] = useState<CadenceBlock[]>(() => storedValue("ritmo-cadence-blocks", initialCadenceBlocks));
@@ -589,7 +615,7 @@ export default function Home() {
     }
 
     const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }, { data: financeRows, error: financeError }] = await Promise.all([
-      client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, position").eq("workspace_id", currentWorkspaceId).order("position", { ascending: true }),
+      client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, position, linked_funnel_id, linked_stage_id").eq("workspace_id", currentWorkspaceId).order("position", { ascending: true }),
       client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
       client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
       client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
@@ -670,10 +696,11 @@ export default function Home() {
       contactRole: deal.contact_role ?? "",
       contactEmail: deal.contact_email ?? "",
       contactPhone: deal.contact_phone ?? "",
-      companyData: (() => { const data = deal.company_data ?? {}; return data.__ritmoStageHistory ? Object.fromEntries(Object.entries(data).filter(([key]) => key !== "__ritmoStageHistory")) : data; })(),
+      companyData: (() => { const data = deal.company_data ?? {}; return Object.fromEntries(Object.entries(data).filter(([key]) => key !== "__ritmoStageHistory" && key !== "__ritmoStageEvents")); })(),
       activities: Array.isArray(deal.activities) ? deal.activities : [],
       notes: Array.isArray(deal.notes) ? deal.notes : [],
       stageHistory: Array.isArray(deal.company_data?.__ritmoStageHistory) && deal.company_data.__ritmoStageHistory.length ? deal.company_data.__ritmoStageHistory : [deal.stage_id],
+      stageEvents: Array.isArray(deal.company_data?.__ritmoStageEvents) && deal.company_data.__ritmoStageEvents.length ? deal.company_data.__ritmoStageEvents : undefined,
     }));
 
     setGoals(normalizedGoals);
@@ -757,7 +784,7 @@ export default function Home() {
     const client = getSupabaseClient();
     const stageToFunnel = new Map(funnels.flatMap((funnel) => funnel.stages.map((stage) => [stage.id, funnel.id] as const)));
     const syncCloudState = async () => {
-      if (goals.length) await client.from("goals").upsert(goals.map((goal, position) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color, recurring: goal.recurring, position })));
+      if (goals.length) await client.from("goals").upsert(goals.map((goal, position) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color, recurring: goal.recurring, linked_funnel_id: goal.linkedFunnelId || null, linked_stage_id: goal.linkedStageId || null, position })));
       await client.from("conversion_settings").upsert({ workspace_id: workspaceId, rates: conversionRates, updated_at: new Date().toISOString() });
       const funnelIds = funnels.map((funnel) => funnel.id);
       const { data: remoteFunnels } = await client.from("funnels").select("id").eq("workspace_id", workspaceId);
@@ -778,7 +805,7 @@ export default function Home() {
       if (stageRows.length) await client.from("stages").upsert(stageRows);
       const opportunityRows = deals.flatMap((deal, position) => {
         const funnelId = stageToFunnel.get(deal.stageId);
-        return funnelId ? [{ id: deal.id, funnel_id: funnelId, stage_id: deal.stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? null, contact_role: deal.contactRole ?? null, contact_email: deal.contactEmail ?? null, contact_phone: deal.contactPhone ?? null, company_data: { ...(deal.companyData ?? {}), __ritmoStageHistory: deal.stageHistory ?? [deal.stageId] }, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : [];
+        return funnelId ? [{ id: deal.id, funnel_id: funnelId, stage_id: deal.stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? null, contact_role: deal.contactRole ?? null, contact_email: deal.contactEmail ?? null, contact_phone: deal.contactPhone ?? null, company_data: { ...(deal.companyData ?? {}), __ritmoStageHistory: deal.stageHistory ?? [deal.stageId], __ritmoStageEvents: stageEventsForDeal(deal) }, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : [];
       });
       if (funnelIds.length) {
         const { data: remoteOpportunities } = await client.from("opportunities").select("id, funnel_id").in("funnel_id", funnelIds);
@@ -835,7 +862,8 @@ export default function Home() {
     const stage = activeFunnel?.stages.find((item) => item.id === deal.stageId);
     return sum + deal.value * ((stage?.probability ?? 0) / 100);
   }, 0);
-  const computedGoals = useMemo(() => goals.map((goal) => goal.linkedStageId ? { ...goal, actual: accumulatedStageCount(deals, goal.linkedStageId) } : goal), [goals, deals]);
+  const visibleGoals = useMemo(() => goals.filter((goal) => goalMatchesMonth(goal, selectedGoalMonth)), [goals, selectedGoalMonth]);
+  const computedGoals = useMemo(() => visibleGoals.map((goal) => goal.linkedStageId ? { ...goal, actual: accumulatedStageCount(deals, goal.linkedStageId, selectedGoalMonth) } : goal), [visibleGoals, deals, selectedGoalMonth]);
   const achievedRevenue = computedGoals
     .filter((goal) => goal.unit === "R$")
     .reduce((sum, goal) => sum + goal.actual, 0);
@@ -918,6 +946,7 @@ export default function Home() {
       companyData: { website: record.companyWebsite, monthlyVisits: record.monthlyVisits, analysis: record.analysis, __ritmoProspectId: record.id, __ritmoProspectListId: list.id },
       notes: record.analysis.trim() ? [{ id: uniqueId("note"), content: record.analysis.trim(), createdAt: new Date().toISOString() }] : [],
       stageHistory: [stage.id],
+      stageEvents: [{ stageId: stage.id, occurredAt: new Date().toISOString() }],
     }));
     setDeals((current) => [...importedDeals, ...current]);
     toast.success(`${importedDeals.length} ${importedDeals.length === 1 ? "card criado" : "cards criados"} em ${stage.name}.`);
@@ -1183,7 +1212,7 @@ export default function Home() {
       setDeals((current) => current.map((deal) => (deal.id === dealDraft.id ? dealDraft : deal)));
       toast.success("Oportunidade atualizada.");
     } else {
-      setDeals((current) => [{ ...dealDraft, id: uniqueId("deal"), stageHistory: [dealDraft.stageId] }, ...current]);
+      setDeals((current) => [{ ...dealDraft, id: uniqueId("deal"), stageHistory: [dealDraft.stageId], stageEvents: [{ stageId: dealDraft.stageId, occurredAt: new Date().toISOString() }] }, ...current]);
       toast.success("Oportunidade criada.");
     }
     setDealDialogOpen(false);
@@ -1472,6 +1501,8 @@ export default function Home() {
           <GoalsWorkspace
             goals={computedGoals}
             averageGoalProgress={averageGoalProgress}
+            selectedMonth={selectedGoalMonth}
+            onSelectedMonthChange={setSelectedGoalMonth}
             onNewGoal={openNewGoal}
             onOpenPipeline={() => setPage("pipeline")}
             onEditGoal={openEditGoal}
@@ -1707,14 +1738,14 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
   );
 }
 
-function GoalsWorkspace({ goals, averageGoalProgress, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, funnels, conversionRates, onSaveConversionRates }: { goals: GoalItem[]; averageGoalProgress: number; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
+function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedMonthChange, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, funnels, conversionRates, onSaveConversionRates }: { goals: GoalItem[]; averageGoalProgress: number; selectedMonth: string; onSelectedMonthChange: (month: string) => void; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
   const daysRemaining = daysUntilMonthEnd();
   const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date());
   return (
     <div className="pt-[68px] md:pt-0">
       <header className="flex min-h-[116px] items-center justify-between px-5 py-6 md:px-10">
-        <div><p className="eyebrow">Plano de agosto <span className="mx-1 text-[#10A97A]">•</span> ciclo em andamento</p><h1 className="page-title">Metas <span className="text-[#10A97A]">em movimento</span></h1></div>
-        <div className="hidden items-center gap-3 sm:flex"><button className="tool-button" onClick={onOpenPipeline}><Search size={18} /><span>Ver funil</span></button><Button onClick={onNewGoal} className="h-11 gap-2 rounded-xl bg-[#10A97A] px-5 font-bold hover:bg-[#087E5A]"><Plus size={18} />Nova meta</Button></div>
+        <div><p className="eyebrow">Plano mensal <span className="mx-1 text-[#10A97A]">•</span> ciclo em andamento</p><h1 className="page-title">Metas <span className="text-[#10A97A]">em movimento</span></h1></div>
+        <div className="hidden items-center gap-3 sm:flex"><label className="flex items-center gap-2 rounded-xl border border-[#DDE8E0] bg-white px-3 text-xs font-bold uppercase tracking-[0.08em] text-[#6E7C74]">Mês <Input type="month" value={selectedMonth} onChange={(event) => onSelectedMonthChange(event.target.value)} className="h-9 w-[132px] border-0 bg-transparent p-0 text-sm font-bold normal-case tracking-normal text-[#1B2522] shadow-none focus-visible:ring-0" aria-label="Filtrar mês das metas" /></label><button className="tool-button" onClick={onOpenPipeline}><Search size={18} /><span>Ver funil</span></button><Button onClick={onNewGoal} className="h-11 gap-2 rounded-xl bg-[#10A97A] px-5 font-bold hover:bg-[#087E5A]"><Plus size={18} />Nova meta</Button></div>
       </header>
 
       <div className="px-5 pb-12 md:px-10">
