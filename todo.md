@@ -301,3 +301,5 @@
 - [x] Remover a área inferior redundante de metas sem perder o arrastar e soltar
 - [x] Mover a indicação automática de funil e etapa para o topo dos cards de Metas
 - [x] Remover a repetição de Prospecção na linha inferior dos cards de Metas
+- [x] Remover a observação sobre sábados, domingos e feriados do card Fechamento do mês
+- [x] Aumentar o número e os textos do card Fechamento do mês
