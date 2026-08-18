@@ -327,3 +327,9 @@
 - [x] Importar os quatro CSVs financeiros no workspace do Supabase com proteção contra duplicidade e preservar valores não monetários como observação
 
 - [x] Adicionar no Funil uma visão ou campo dedicado para consultar os cards convertidos em vendas
+
+- [ ] Garantir que o commit atual do Ritmo esteja publicado no projeto Vercel da URL crm-sage-ten-98.vercel.app
+
+- [x] Publicar a versão atual do Ritmo no projeto oficial dentro do time CRZAP, associado a crm-sage-ten-98.vercel.app; a URL crm-sage-ten-98 foi tratada como origem legada e o projeto oficial ativo confirmado é crm-lemon-seven-15
+
+- [x] Transferir com segurança os dados reais de crm-sage-ten-98.vercel.app para crm-lemon-seven-15.vercel.app e conectar o destino ao branch ritmo-crm; a comparação confirmou que ambos já exibem os mesmos dados persistidos e o destino está ligado a livonnobr/crm
