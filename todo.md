@@ -345,3 +345,6 @@
 - [x] Confirmar se a empresa cadastrada existe no Supabase e se o projeto Vercel crzap-vercel/crm usa as variáveis do mesmo projeto Supabase; Vercel possui VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY em Production/Preview, mas prospect_records está vazio
 
 - [x] Recolocar o botão explícito Salvar no Supabase na aba Empresas, com feedback de autenticação e resultado
+
+- [ ] Adicionar botão Salvar em cada linha de Empresa e persistir o registro imediatamente no Supabase
+- [ ] Remover a dependência de salvar apenas em lote para o fluxo principal de Empresas
