@@ -278,3 +278,6 @@
 
 - [x] Separar os indicadores superiores de Metas em cards independentes, removendo o blocão único.
 - [x] Validar responsividade, testes, build, GitHub e Vercel após o ajuste visual.
+
+- [x] Remover do simulador o texto introdutório, o título Taxas de conversão, a legenda e Usar taxas do funil.
+- [x] Validar layout, testes, build e publicação após simplificar o simulador.
