@@ -186,7 +186,29 @@ var systemRouter = router({
 
 // server/supabase.ts
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 var adminClient = null;
+function stableUuid(value, namespace) {
+  const source = `${namespace}:${String(value ?? "")}`;
+  const hex = createHash("sha1").update(source).digest("hex").slice(0, 32).split("");
+  hex[12] = "4";
+  hex[16] = (parseInt(hex[16], 16) & 3 | 8).toString(16);
+  return `${hex.slice(0, 8).join("")}-${hex.slice(8, 12).join("")}-${hex.slice(12, 16).join("")}-${hex.slice(16, 20).join("")}-${hex.slice(20, 32).join("")}`;
+}
+function entityUuid(value, namespace) {
+  const candidate = String(value ?? "");
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate) ? candidate : stableUuid(candidate, namespace);
+}
+function mapStageReference(value) {
+  return entityUuid(value, "stage");
+}
+function mapFunnelReference(value) {
+  return entityUuid(value, "funnel");
+}
+function mapGoalReference(value, namespace) {
+  if (value == null || value === "") return null;
+  return entityUuid(value, namespace);
+}
 function getAdminClient() {
   if (adminClient) return adminClient;
   if (!ENV.supabaseUrl || !ENV.supabaseServiceRoleKey) {
@@ -257,9 +279,9 @@ async function syncWorkspaceSnapshot(workspaceId, state) {
   const cadenceBlocks = Array.isArray(state.cadenceBlocks) ? state.cadenceBlocks : [];
   const financeEntries = Array.isArray(state.financeEntries) ? state.financeEntries : [];
   const services = Array.isArray(state.services) ? state.services : [];
-  const stageToFunnel = new Map(funnels.flatMap((funnel) => (funnel.stages ?? []).map((stage) => [stage.id, funnel.id])));
-  const funnelIds = funnels.map((funnel) => funnel.id);
-  const goalRows = goals.map((goal, position) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goal.period, color: goal.color, recurring: Boolean(goal.recurring), monthly_overrides: goal.monthlyOverrides ?? {}, linked_funnel_id: goal.linkedFunnelId || null, linked_stage_id: goal.linkedStageId || null, position }));
+  const stageToFunnel = new Map(funnels.flatMap((funnel) => (funnel.stages ?? []).map((stage) => [mapStageReference(stage.id), mapFunnelReference(funnel.id)])));
+  const funnelIds = funnels.map((funnel) => mapFunnelReference(funnel.id));
+  const goalRows = goals.map((goal, position) => ({ id: entityUuid(goal.id, "goal"), workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goal.period, color: goal.color, recurring: Boolean(goal.recurring), monthly_overrides: goal.monthlyOverrides ?? {}, linked_funnel_id: mapGoalReference(goal.linkedFunnelId, "funnel"), linked_stage_id: mapGoalReference(goal.linkedStageId, "stage"), position }));
   if (goalRows.length) {
     const { error } = await supabase.from("goals").upsert(goalRows);
     if (error) throw error;
@@ -275,12 +297,12 @@ async function syncWorkspaceSnapshot(workspaceId, state) {
       if (error) throw error;
     }
   }
-  const funnelRows = funnels.map((funnel, position) => ({ id: funnel.id, workspace_id: workspaceId, name: funnel.name, currency: funnel.currency, position }));
+  const funnelRows = funnels.map((funnel, position) => ({ id: mapFunnelReference(funnel.id), workspace_id: workspaceId, name: funnel.name, currency: funnel.currency, position }));
   if (funnelRows.length) {
     const { error } = await supabase.from("funnels").upsert(funnelRows);
     if (error) throw error;
   }
-  const stageRows = funnels.flatMap((funnel) => (funnel.stages ?? []).map((stage, position) => ({ id: stage.id, funnel_id: funnel.id, name: stage.name, color: stage.color, probability: stage.probability, position })));
+  const stageRows = funnels.flatMap((funnel) => (funnel.stages ?? []).map((stage, position) => ({ id: mapStageReference(stage.id), funnel_id: mapFunnelReference(funnel.id), name: stage.name, color: stage.color, probability: stage.probability, position })));
   if (funnelIds.length) {
     const { data: existingStages, error } = await supabase.from("stages").select("id").in("funnel_id", funnelIds);
     if (error) throw error;
@@ -296,8 +318,9 @@ async function syncWorkspaceSnapshot(workspaceId, state) {
     if (error) throw error;
   }
   const opportunityRows = deals.flatMap((deal, position) => {
-    const funnelId = stageToFunnel.get(deal.stageId);
-    return funnelId ? [{ id: deal.id, funnel_id: funnelId, stage_id: deal.stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? null, contact_role: deal.contactRole ?? null, contact_email: deal.contactEmail ?? null, contact_phone: deal.contactPhone ?? null, company_data: { ...deal.companyData ?? {}, __ritmoStageHistory: deal.stageHistory ?? [deal.stageId], __ritmoStageEvents: deal.companyData?.__ritmoStageEvents ?? [] }, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : [];
+    const stageId = mapStageReference(deal.stageId);
+    const funnelId = stageToFunnel.get(stageId);
+    return funnelId ? [{ id: entityUuid(deal.id, "opportunity"), funnel_id: funnelId, stage_id: stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? null, contact_role: deal.contactRole ?? null, contact_email: deal.contactEmail ?? null, contact_phone: deal.contactPhone ?? null, company_data: { ...deal.companyData ?? {}, __ritmoStageHistory: (deal.stageHistory ?? [deal.stageId]).map((value) => mapStageReference(value)), __ritmoStageEvents: (deal.companyData?.__ritmoStageEvents ?? deal.stageEvents ?? []).map((event) => ({ ...event, stageId: mapStageReference(event.stageId) })) }, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : [];
   });
   if (funnelIds.length) {
     const { data: existingDeals, error } = await supabase.from("opportunities").select("id").in("funnel_id", funnelIds);
@@ -368,14 +391,14 @@ async function syncWorkspaceSnapshot(workspaceId, state) {
   }
   const { data: existingServices, error: servicesReadError } = await supabase.from("services").select("id").eq("workspace_id", workspaceId);
   if (servicesReadError) throw servicesReadError;
-  const serviceIds = services.map((service) => service.id);
+  const serviceIds = services.map((service) => entityUuid(service.id, "service"));
   const staleServices = (existingServices ?? []).map((row) => row.id).filter((id) => !serviceIds.includes(id));
   if (staleServices.length) {
     const result = await supabase.from("services").delete().in("id", staleServices);
     if (result.error) throw result.error;
   }
   if (services.length) {
-    const result = await supabase.from("services").upsert(services.map((service, position) => ({ id: service.id, workspace_id: workspaceId, name: service.name, deliverables: service.deliverables ?? "", deadline: service.deadline, deadline_unit: service.deadlineUnit, price: service.price, pricing_type: service.pricingType, position, updated_at: (/* @__PURE__ */ new Date()).toISOString() })));
+    const result = await supabase.from("services").upsert(services.map((service, position) => ({ id: entityUuid(service.id, "service"), workspace_id: workspaceId, name: service.name, deliverables: service.deliverables ?? "", deadline: service.deadline, deadline_unit: service.deadlineUnit, price: service.price, pricing_type: service.pricingType, position, updated_at: (/* @__PURE__ */ new Date()).toISOString() })));
     if (result.error) throw result.error;
   }
   return { ok: true };
