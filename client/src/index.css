@@ -118,6 +118,18 @@
   .goal-meter { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(#10A97A var(--progress), #E8ECE7 0); position: relative; }
   .goal-meter::before { content: ""; position: absolute; inset: 5px; border-radius: 9999px; background: #FCFCFA; }
   .goal-meter span { position: relative; z-index: 1; font-size: 10px; font-weight: 800; color: #087E5A; }
+  .goals-page { min-height: 100%; background: linear-gradient(180deg, #F8FAF7 0%, #F4F6F2 28%, #F4F6F2 100%); }
+  .goals-page > header { box-shadow: 0 1px 0 rgba(35,54,43,.025); }
+  .goal-compact-card { @apply rounded-xl border border-[#E2E9E2] bg-[#FCFCFA] p-3 shadow-[0_5px_14px_rgba(35,54,43,0.04)] transition duration-150 hover:-translate-y-0.5 hover:border-[#BFD6C8] hover:shadow-[0_8px_20px_rgba(35,54,43,0.07)]; }
+  .goal-meter-compact { width: 36px; height: 36px; }
+  .goal-meter-compact::before { inset: 4px; }
+  .goal-meter-compact span { font-size: 9px; }
+  .calendar-compact-card { min-height: 0; }
+  .simulator-panel { @apply border-[#D9E7DE] bg-[#F7FBF8] shadow-[0_10px_28px_rgba(35,54,43,0.04)]; }
+  .simulator-stage { @apply border-[#E0E9E1] bg-[#FCFDFC] shadow-[0_2px_8px_rgba(35,54,43,0.02)]; }
+  .simulator-reading { @apply border-[#CFE3D6] shadow-[0_8px_20px_rgba(35,54,43,0.035)]; }
+  .planos-cadence > div { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+  .planos-cadence h1 { font-size: 1.25rem; }
   .pulse-dot { @apply h-2 w-2 rounded-full bg-[#8DE2C4] shadow-[0_0_0_4px_rgba(141,226,196,0.13)]; }
 }
 
