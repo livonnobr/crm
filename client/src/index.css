@@ -124,8 +124,10 @@
   .goals-content { position: relative; }
   .goals-overview { min-width: 0; }
   .goals-overview-head { padding-inline: .15rem; }
-  .goals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .7rem; align-items: start; }
-  .goal-compact-card { @apply rounded-[14px] border border-[#DDE7DF] bg-[#FFFFFF] p-3 shadow-[0_3px_12px_rgba(35,54,43,0.025)] transition duration-150 hover:-translate-y-0.5 hover:border-[#B5D2C0] hover:shadow-[0_8px_18px_rgba(35,54,43,0.06)]; }
+  .goals-grid { display: grid; grid-template-columns: 1fr; gap: .9rem; align-items: start; }
+  .goal-compact-card { @apply rounded-[14px] border border-[#DDE7DF] bg-[#FFFFFF] p-4 shadow-[0_3px_12px_rgba(35,54,43,0.025)] transition duration-150 hover:-translate-y-0.5 hover:border-[#B5D2C0] hover:shadow-[0_8px_18px_rgba(35,54,43,0.06)]; }
+  @media (min-width: 768px) { .goals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1280px) { .goals-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .goal-card-main { display: flex; min-width: 0; align-items: center; gap: .65rem; margin-top: .65rem; }
   .goal-card-progress { height: 3px; margin-top: .7rem; overflow: hidden; border-radius: 999px; background: #EDF1ED; }
   .goal-card-progress-bar { height: 100%; border-radius: inherit; background: #10A97A; transition: width 180ms ease; }
