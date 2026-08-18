@@ -66,6 +66,7 @@ import { summarizeFinanceEntries } from "@/lib/finance";
 import { cleanGoalPeriod, goalPeriodInputType, goalPeriodInputValue, goalPeriodValue as goalPeriodValueFromHelper, periodValueForDate } from "@/lib/goal-period";
 import { businessDaysUntilMonthEnd } from "@/lib/business-days";
 import { persistenceActionLabel, persistenceLabel } from "@/lib/persistence-status";
+import { trpc } from "@/lib/trpc";
 
 type Page = "goals" | "pipeline" | "activities" | "people" | "prospecting" | "cadence" | "finance";
 
@@ -545,6 +546,9 @@ export default function Home() {
   // startLogin() during render (no href={startLogin()}) — it mints a one-time
   // nonce cookie and must run only at the moment of navigation.
   let { user, loading, error, isAuthenticated, logout } = useAuth();
+  const workspaceBootstrap = trpc.workspace.bootstrap.useQuery(undefined, { enabled: isAuthenticated });
+  const workspaceSnapshot = trpc.workspace.snapshot.useQuery(undefined, { enabled: isAuthenticated });
+  const syncWorkspaceMutation = trpc.workspace.sync.useMutation();
 
   const [page, setPage] = useState<Page>(() => {
     const tab = new URLSearchParams(window.location.search).get("aba");
@@ -591,49 +595,31 @@ export default function Home() {
   const pendingDeleteDeal = deals.find((deal) => deal.id === deleteDealId) ?? null;
   const cadenceEditBlock = cadenceBlocks.find((block) => block.id === cadenceEditId) ?? null;
 
-  async function loadCloudWorkspace(userId: string) {
+  async function loadCloudWorkspace(currentWorkspaceId: string) {
     if (!supabase) return;
     setIsCloudHydrating(true);
     setIsCloudLoading(true);
     const client = getSupabaseClient();
-    const { data: existingWorkspace, error: workspaceLookupError } = await client
-      .from("workspaces")
-      .select("id")
-      .eq("owner_id", userId)
-      .maybeSingle();
-
-    if (workspaceLookupError) {
-      toast.error("Não foi possível abrir seu espaço comercial.");
-      setIsCloudLoading(false);
-      setIsCloudHydrating(false);
-      return;
-    }
-
-    let currentWorkspaceId = existingWorkspace?.id as string | undefined;
-    if (!currentWorkspaceId) {
-      const { data: createdWorkspace, error: createWorkspaceError } = await client
-        .from("workspaces")
-        .insert({ owner_id: userId, name: "Meu espaço comercial" })
-        .select("id")
-        .single();
-      if (createWorkspaceError || !createdWorkspace) {
-        toast.error("Não foi possível criar seu espaço comercial.");
-        setIsCloudLoading(false);
-        setIsCloudHydrating(false);
-        return;
-      }
-      currentWorkspaceId = createdWorkspace.id as string;
-    }
-
-    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }, { data: financeRows, error: financeError }] = await Promise.all([
-      client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, position, linked_funnel_id, linked_stage_id").eq("workspace_id", currentWorkspaceId).order("position", { ascending: true }),
-      client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
-      client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
-      client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
-      client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_role, decision_maker_email, decision_maker_phone, decision_maker_secondary_phone, monthly_visits, company, company_website, analysis, position").order("position"),
-      client.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
-      client.from("finance_entries").select("id, workspace_id, expense, amount, installment, due_date, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
-    ]);
+    const remoteSnapshot = workspaceSnapshot.data?.snapshot;
+    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }, { data: financeRows, error: financeError }] = remoteSnapshot
+      ? [
+          { data: remoteSnapshot.goals, error: null },
+          { data: remoteSnapshot.funnels, error: null },
+          { data: remoteSnapshot.conversionSettings, error: null },
+          { data: remoteSnapshot.prospectLists, error: null },
+          { data: remoteSnapshot.prospectRecords, error: null },
+          { data: remoteSnapshot.cadenceBlocks, error: null },
+          { data: remoteSnapshot.financeEntries, error: null },
+        ]
+      : await Promise.all([
+          client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, position, linked_funnel_id, linked_stage_id").eq("workspace_id", currentWorkspaceId).order("position", { ascending: true }),
+          client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
+          client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
+          client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
+          client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_role, decision_maker_email, decision_maker_phone, decision_maker_secondary_phone, monthly_visits, company, company_website, analysis, position").order("position"),
+          client.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
+          client.from("finance_entries").select("id, workspace_id, expense, amount, installment, due_date, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
+        ]);
 
     if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError || cadenceBlocksError || financeError) {
       toast.error("Não foi possível carregar os dados salvos.");
@@ -644,12 +630,14 @@ export default function Home() {
 
     const cloudFunnels = (funnelRows ?? []) as FunnelRecord[];
     const funnelIds = cloudFunnels.map((funnel) => funnel.id);
-    const [{ data: stageRows, error: stagesError }, { data: opportunityRows, error: opportunitiesError }] = funnelIds.length
-      ? await Promise.all([
-          client.from("stages").select("id, funnel_id, name, color, probability, position").in("funnel_id", funnelIds).order("position"),
-          client.from("opportunities").select("id, funnel_id, stage_id, title, company, value, owner_initials, tag, next_activity, position, contact_name, contact_role, contact_email, contact_phone, company_data, activities, notes").in("funnel_id", funnelIds).order("position"),
-        ])
-      : [{ data: [], error: null }, { data: [], error: null }];
+    const [{ data: stageRows, error: stagesError }, { data: opportunityRows, error: opportunitiesError }] = remoteSnapshot
+      ? [{ data: remoteSnapshot.stages, error: null }, { data: remoteSnapshot.opportunities, error: null }]
+      : funnelIds.length
+        ? await Promise.all([
+            client.from("stages").select("id, funnel_id, name, color, probability, position").in("funnel_id", funnelIds).order("position"),
+            client.from("opportunities").select("id, funnel_id, stage_id, title, company, value, owner_initials, tag, next_activity, position, contact_name, contact_role, contact_email, contact_phone, company_data, activities, notes").in("funnel_id", funnelIds).order("position"),
+          ])
+        : [{ data: [], error: null }, { data: [], error: null }];
 
     if (stagesError || opportunitiesError) {
       toast.error("Não foi possível carregar o funil salvo.");
@@ -731,32 +719,13 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!supabase) return;
-    let mounted = true;
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-      if (session?.user) {
-        setAccountEmail(session.user.email ?? null);
-        void loadCloudWorkspace(session.user.id);
-      } else {
-        setIsCloudLoading(false);
-      }
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setAccountEmail(session.user.email ?? null);
-        void loadCloudWorkspace(session.user.id);
-      } else {
-        setWorkspaceId(null);
-        setAccountEmail(null);
-        setIsCloudLoading(false);
-      }
-    });
-    return () => {
-      mounted = false;
-      listener.subscription.unsubscribe();
-    };
-  }, []);
+    if (!workspaceSnapshot.data?.workspaceId) {
+      if (!isAuthenticated) setIsCloudLoading(false);
+      return;
+    }
+    setAccountEmail(user?.email ?? null);
+    void loadCloudWorkspace(workspaceSnapshot.data.workspaceId);
+  }, [workspaceSnapshot.data?.workspaceId, workspaceSnapshot.data?.snapshot, isAuthenticated, user?.email]);
 
   useEffect(() => {
     if (!workspaceId) window.localStorage.setItem("ritmo-goals", JSON.stringify(goals));
@@ -793,6 +762,19 @@ export default function Home() {
 
   useEffect(() => {
     if (!workspaceId || !supabase || isCloudHydrating) return;
+    if (isAuthenticated) {
+      void syncWorkspaceMutation.mutateAsync({ state: {
+        goals: goals.map((goal) => ({ ...goal, period: goalPeriodValue(goal) })),
+        funnels,
+        deals: deals.map((deal) => ({ ...deal, companyData: { ...(deal.companyData ?? {}), __ritmoStageEvents: stageEventsForDeal(deal) } })),
+        conversionRates,
+        prospectLists,
+        trashedProspectLists,
+        cadenceBlocks,
+        financeEntries,
+      } }).catch(() => toast.error("Não foi possível sincronizar os dados com o Supabase."));
+      return;
+    }
     const client = getSupabaseClient();
     const stageToFunnel = new Map(funnels.flatMap((funnel) => funnel.stages.map((stage) => [stage.id, funnel.id] as const)));
     const syncCloudState = async () => {
@@ -856,7 +838,7 @@ export default function Home() {
       if (financeEntries.length) await client.from("finance_entries").upsert(financeEntries.map((entry, position) => ({ id: entry.id, workspace_id: workspaceId, expense: entry.expense, amount: entry.amount, installment: entry.installment, due_date: entry.dueDate || null, notes: entry.notes, position, updated_at: new Date().toISOString() })));
     };
     void syncCloudState();
-  }, [goals, funnels, deals, conversionRates, cadenceBlocks, financeEntries, workspaceId, isCloudHydrating]);
+  }, [goals, funnels, deals, conversionRates, prospectLists, trashedProspectLists, cadenceBlocks, financeEntries, workspaceId, isCloudHydrating, isAuthenticated]);
 
   const activeFunnel = funnels.find((funnel) => funnel.id === activeFunnelId) ?? funnels[0];
   const funnelDeals = useMemo(

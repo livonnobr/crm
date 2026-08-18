@@ -348,3 +348,8 @@
 
 - [x] Adicionar botão Salvar em cada linha de Empresa e persistir o registro imediatamente no Supabase
 - [x] Remover a dependência de salvar apenas em lote para o fluxo principal de Empresas; o salvamento individual agora é a ação principal por linha
+
+- [x] Conectar automaticamente o app ao Supabase pelo backend seguro, sem exigir o botão Conectar conta na aba Empresas
+- [x] Fazer Empresas, Metas e Funil usarem automaticamente o workspace do proprietário
+
+- [x] Restringir o snapshot server-side de Empresas aos registros das listas do workspace autenticado
