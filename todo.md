@@ -322,3 +322,6 @@
 - [x] Antes de continuar o Financeiro, sincronizar todas as modificações locais pendentes com GitHub e Vercel e confirmar o deploy de produção
 
 - [x] Reorganizar o card Fechamento do mês para deixar o título menor acima do calendário, evitar sobreposição e reforçar o contraste da grade
+
+- [x] Criar um workspace técnico no Supabase crmsupa para associar a importação financeira, sem criar dados financeiros fictícios
+- [x] Importar os quatro CSVs financeiros no workspace do Supabase com proteção contra duplicidade e preservar valores não monetários como observação
