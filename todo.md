@@ -337,3 +337,7 @@
 - [x] Verificar se o lead cadastrado em Empresas está persistido no Supabase e associado ao workspace correto; consulta confirmou 0 registros em prospect_records
 
 - [x] Exibir estado de autenticação e confirmação explícita na aba Empresas quando o lead ainda estiver apenas no armazenamento local
+
+- [ ] Auditar na Vercel oficial por que Empresas e Metas não estão persistindo no Supabase e corrigir o fluxo/configuração
+
+- [x] Redesenhar os ícones da Cadência e deixar apenas o ícone do canal nos cards, sem texto ao lado
