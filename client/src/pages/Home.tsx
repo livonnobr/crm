@@ -14,6 +14,7 @@ import {
   Calendar,
   CheckCircle2,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   Circle,
   CircleDollarSign,
@@ -174,6 +175,11 @@ type Stage = {
 };
 
 type SimulationProjectionMode = "percentual" | "fixo" | "produto";
+type ActiveSimulationProjectionMode = "fixo" | "produto";
+
+function normalizeSimulationProjectionMode(mode: SimulationProjectionMode | null | undefined): ActiveSimulationProjectionMode {
+  return mode === "produto" ? "produto" : "fixo";
+}
 
 type GoalSimulationStage = {
   id: string;
@@ -336,10 +342,10 @@ const initialGoals: GoalItem[] = [
 ];
 
 const initialGoalSimulationStages: GoalSimulationStage[] = [
-  { id: "simulation-entry", name: "Entrada", color: "#77918B", probability: 100, projectionMode: "percentual", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 100, revenueBase: "produto", averageTicket: 0 },
-  { id: "simulation-diagnosis", name: "Diagnóstico", color: "#5B8CB2", probability: 50, projectionMode: "percentual", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 50, revenueBase: "produto", averageTicket: 0 },
-  { id: "simulation-proposal", name: "Proposta", color: "#B07D3A", probability: 35, projectionMode: "percentual", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 35, revenueBase: "produto", averageTicket: 0 },
-  { id: "simulation-won", name: "Ganho", color: "#10A97A", probability: 20, projectionMode: "percentual", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 20, revenueBase: "produto", averageTicket: 0 },
+  { id: "simulation-entry", name: "Entrada", color: "#77918B", probability: 100, projectionMode: "fixo", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 100, revenueBase: "produto", averageTicket: 0 },
+  { id: "simulation-diagnosis", name: "Diagnóstico", color: "#5B8CB2", probability: 50, projectionMode: "fixo", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 50, revenueBase: "produto", averageTicket: 0 },
+  { id: "simulation-proposal", name: "Proposta", color: "#B07D3A", probability: 35, projectionMode: "fixo", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 35, revenueBase: "produto", averageTicket: 0 },
+  { id: "simulation-won", name: "Ganho", color: "#10A97A", probability: 20, projectionMode: "fixo", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 20, revenueBase: "produto", averageTicket: 0 },
 ];
 
 const initialFunnels: SalesFunnel[] = [
@@ -688,7 +694,7 @@ export default function Home() {
           { data: remoteSnapshot.services, error: null },
         ]
       : await Promise.all([
-          client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, position, linked_funnel_id, linked_stage_id").eq("workspace_id", currentWorkspaceId).order("position", { ascending: true }),
+          client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, monthly_overrides, position, linked_funnel_id, linked_stage_id").eq("workspace_id", currentWorkspaceId).order("position", { ascending: true }),
           client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
           client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
           client.from("goal_simulation_stages").select("id, workspace_id, name, color, probability, projection_mode, fixed_value, product_id, conversion_stage_id, conversion_rate, revenue_base, average_ticket, position").eq("workspace_id", currentWorkspaceId).order("position"),
@@ -745,7 +751,7 @@ export default function Home() {
     const normalizedCadenceBlocks = ((cadenceBlockRows ?? []) as CadenceBlockRow[]).map((block) => ({ id: block.id, day: Number(block.day), slot: block.slot, title: block.title, channel: block.channel, notes: block.notes }));
     const normalizedFinanceEntries = ((financeRows ?? []) as FinanceEntryRow[]).map((entry) => ({ id: entry.id, expense: entry.expense, amount: Number(entry.amount), installment: entry.installment, dueDate: entry.due_date ?? "", notes: entry.notes }));
     const normalizedServices = ((serviceRows ?? []) as ServiceRow[]).sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0)).map((service, position) => ({ id: service.id, name: service.name, deliverables: service.deliverables, deadline: Number(service.deadline), deadlineUnit: service.deadline_unit, price: Number(service.price), pricingType: service.pricing_type, position }));
-    const normalizedGoalSimulationStages = ((goalSimulationStageRows ?? []) as GoalSimulationStageRecord[]).map((stage) => ({ id: stage.id, name: stage.name, color: stage.color, probability: Number(stage.probability), projectionMode: (stage.projection_mode === "fixo" || stage.projection_mode === "produto" ? stage.projection_mode : "percentual") as SimulationProjectionMode, fixedValue: Math.max(0, Number(stage.fixed_value) || 0), productId: stage.product_id ?? "", conversionStageId: stage.conversion_stage_id ?? "", conversionRate: Math.min(100, Math.max(0, Number(stage.conversion_rate) || Number(stage.probability) || 0)), revenueBase: stage.revenue_base === "ticket" ? "ticket" as const : "produto" as const, averageTicket: Math.max(0, Number(stage.average_ticket) || 0) }));
+    const normalizedGoalSimulationStages = ((goalSimulationStageRows ?? []) as GoalSimulationStageRecord[]).map((stage) => ({ id: stage.id, name: stage.name, color: stage.color, probability: Number(stage.probability), projectionMode: normalizeSimulationProjectionMode(stage.projection_mode), fixedValue: Math.max(0, Number(stage.fixed_value) || 0), productId: stage.product_id ?? "", conversionStageId: stage.conversion_stage_id ?? "", conversionRate: Math.min(100, Math.max(0, Number(stage.conversion_rate) || Number(stage.probability) || 0)), revenueBase: stage.revenue_base === "ticket" ? "ticket" as const : "produto" as const, averageTicket: Math.max(0, Number(stage.average_ticket) || 0) }));
 
     const normalizedGoals = ((goalRows ?? []) as GoalRecord[]).map((goal) => ({
       id: goal.id,
@@ -872,7 +878,7 @@ export default function Home() {
   }
 
   async function saveGoalsToCloud(goalsToSave: GoalItem[] = goals, options: { notify?: boolean } = {}) {
-    if (!workspaceId) {
+    if (!(workspaceId ?? workspaceSnapshot.data?.workspaceId)) {
       toast.error("Aguarde a conexão autenticada do Ritmo antes de salvar o Planejamento de Metas.");
       throw new Error("Workspace Supabase indisponível.");
     }
@@ -1240,28 +1246,28 @@ export default function Home() {
 
   function reorderGoals(fromId: string, toId: string) {
     if (fromId === toId) return;
+    const fromIndex = goals.findIndex((goal) => goal.id === fromId);
+    const toIndex = goals.findIndex((goal) => goal.id === toId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const next = [...goals];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    const reordered = next.map((goal, position) => ({ ...goal, position }));
     setIsGoalsSyncConfirmed(false);
-    setGoals((current) => {
-      const fromIndex = current.findIndex((goal) => goal.id === fromId);
-      const toIndex = current.findIndex((goal) => goal.id === toId);
-      if (fromIndex < 0 || toIndex < 0) return current;
-      const next = [...current];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next.map((goal, position) => ({ ...goal, position }));
-    });
+    setGoals(reordered);
+    if (workspaceId || workspaceSnapshot.data?.workspaceId) void saveGoalsToCloud(reordered, { notify: false }).catch(() => {});
   }
 
   function moveGoal(goalId: string, direction: "up" | "down") {
+    const index = goals.findIndex((goal) => goal.id === goalId);
+    const nextIndex = direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || nextIndex < 0 || nextIndex >= goals.length) return;
+    const next = [...goals];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    const reordered = next.map((goal, position) => ({ ...goal, position }));
     setIsGoalsSyncConfirmed(false);
-    setGoals((current) => {
-      const index = current.findIndex((goal) => goal.id === goalId);
-      const nextIndex = direction === "up" ? index - 1 : index + 1;
-      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
-      const next = [...current];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      return next.map((goal, position) => ({ ...goal, position }));
-    });
+    setGoals(reordered);
+    if (workspaceId || workspaceSnapshot.data?.workspaceId) void saveGoalsToCloud(reordered, { notify: false }).catch(() => {});
   }
 
   async function saveGoal(event: FormEvent<HTMLFormElement>) {
@@ -1276,7 +1282,7 @@ export default function Home() {
       nextGoals = goals.map((goal) => {
         if (goal.id !== goalDraft.id) return goal;
         if (goalOverrideMonth && goal.recurring) {
-          return { ...goal, monthlyOverrides: { ...(goal.monthlyOverrides ?? {}), [goalOverrideMonth]: { target: goalDraft.target, actual: goalDraft.actual } } };
+          return { ...goal, ...goalDraft, target: goal.target, actual: goal.actual, monthlyOverrides: { ...(goal.monthlyOverrides ?? {}), [goalOverrideMonth]: { target: goalDraft.target, actual: goalDraft.actual } } };
         }
         return { ...goalDraft, monthlyOverrides: goal.monthlyOverrides ?? goalDraft.monthlyOverrides ?? {} };
       });
@@ -1702,6 +1708,7 @@ export default function Home() {
             onEditGoal={openEditGoal}
             onDeleteGoal={deleteGoal}
             onReorderGoals={reorderGoals}
+            onMoveGoal={moveGoal}
             cadenceBlocks={cadenceBlocks}
             onAddCadenceBlock={addCadenceBlock}
             onMoveCadenceBlock={moveCadenceBlock}
@@ -1712,7 +1719,7 @@ export default function Home() {
             funnels={funnels}
             onAddSimulationStage={() => {
               setIsGoalsSyncConfirmed(false);
-              const nextStage: GoalSimulationStage = { id: uniqueId("goal-simulation-stage"), name: "Nova etapa", color: "#10A97A", probability: 50, projectionMode: "percentual", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 50, revenueBase: "produto", averageTicket: 0 };
+              const nextStage: GoalSimulationStage = { id: uniqueId("goal-simulation-stage"), name: "Nova etapa", color: "#10A97A", probability: 50, projectionMode: "fixo", fixedValue: 0, productId: "", conversionStageId: "", conversionRate: 50, revenueBase: "produto", averageTicket: 0 };
               setGoalSimulationStages((current) => [...current, nextStage]);
               toast.success("Etapa da simulação adicionada.");
             }}
@@ -1799,7 +1806,7 @@ export default function Home() {
               </FormField>
               <FormField label="Tipo de projeção">
                 <select className="form-select" value={goalDraft.unit} onChange={(event) => setGoalDraft({ ...goalDraft, unit: event.target.value as GoalUnit })}>
-                  <option value="%">% (percentual)</option><option value="R$">R$ (valor financeiro)</option>{goalDraft.unit === "atividades" && <option value="atividades">Quantidade (meta antiga)</option>}
+                  <option value="%">Valor fixo (%)</option><option value="R$">Valor financeiro (R$)</option>{goalDraft.unit === "atividades" && <option value="atividades">Quantidade (meta antiga)</option>}
                 </select>
                 <p className="mt-1 text-xs text-[#7D8983]">Escolha como o objetivo e o realizado serão projetados.</p>
               </FormField>
@@ -1967,7 +1974,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
   );
 }
 
-function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedMonthChange, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, cadenceBlocks, onAddCadenceBlock, onMoveCadenceBlock, onEditCadenceBlock, onDeleteCadenceBlock, simulationStages, services, funnels, onAddSimulationStage, onUpdateSimulationStage, onDeleteSimulationStage, onSave, isSaving, syncConfirmed }: { goals: GoalItem[]; averageGoalProgress: number; selectedMonth: string; onSelectedMonthChange: (month: string) => void; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; cadenceBlocks: CadenceBlock[]; onAddCadenceBlock: (day: number, slot: CadenceSlot, details?: Pick<CadenceBlock, "title" | "channel" | "notes">) => void; onMoveCadenceBlock: (id: string, day: number, slot: CadenceSlot) => void; onEditCadenceBlock: (block: CadenceBlock) => void; onDeleteCadenceBlock: (id: string) => void; simulationStages: GoalSimulationStage[]; services: Service[]; funnels: SalesFunnel[]; onAddSimulationStage: () => void; onUpdateSimulationStage: (id: string, field: "name" | "color" | "probability" | "projectionMode" | "fixedValue" | "productId" | "conversionStageId" | "conversionRate" | "revenueBase" | "averageTicket", value: string | number) => void; onDeleteSimulationStage: (id: string) => void; onSave: () => void | Promise<void>; isSaving: boolean; syncConfirmed: boolean }) {
+function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedMonthChange, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, onMoveGoal, cadenceBlocks, onAddCadenceBlock, onMoveCadenceBlock, onEditCadenceBlock, onDeleteCadenceBlock, simulationStages, services, funnels, onAddSimulationStage, onUpdateSimulationStage, onDeleteSimulationStage, onSave, isSaving, syncConfirmed }: { goals: GoalItem[]; averageGoalProgress: number; selectedMonth: string; onSelectedMonthChange: (month: string) => void; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; onMoveGoal: (goalId: string, direction: "up" | "down") => void; cadenceBlocks: CadenceBlock[]; onAddCadenceBlock: (day: number, slot: CadenceSlot, details?: Pick<CadenceBlock, "title" | "channel" | "notes">) => void; onMoveCadenceBlock: (id: string, day: number, slot: CadenceSlot) => void; onEditCadenceBlock: (block: CadenceBlock) => void; onDeleteCadenceBlock: (id: string) => void; simulationStages: GoalSimulationStage[]; services: Service[]; funnels: SalesFunnel[]; onAddSimulationStage: () => void; onUpdateSimulationStage: (id: string, field: "name" | "color" | "probability" | "projectionMode" | "fixedValue" | "productId" | "conversionStageId" | "conversionRate" | "revenueBase" | "averageTicket", value: string | number) => void; onDeleteSimulationStage: (id: string) => void; onSave: () => void | Promise<void>; isSaving: boolean; syncConfirmed: boolean }) {
   const daysRemaining = daysUntilMonthEnd();
   const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date(`${selectedMonth}-01T12:00:00`));
   const calendar = useMemo(() => {
@@ -2023,7 +2030,7 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
                   <div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold tracking-[-0.02em] text-[#27302D]">{goal.title}</p><p className="mt-0.5 font-display text-[19px] font-extrabold tracking-[-0.055em] text-[#1B2522]">{formatGoalValue(displayGoal.actual, displayGoal.unit)}<span className="ml-1 text-[11px] font-bold text-[#85918B]">/ {formatGoalValue(displayGoal.target, displayGoal.unit)}</span></p></div>
                 </div>
                 <div className="goal-card-progress"><div className="goal-card-progress-bar" style={{ width: `${progress}%` }} /></div>
-                <div className="goal-card-foot"><p className="text-[9px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, displayGoal.unit)}</p><span className="inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.1em] text-[#A0ACA5]" title="Arraste para reorganizar"><GripVertical size={11} />Mover</span></div>
+                <div className="goal-card-foot"><p className="text-[9px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, displayGoal.unit)}</p><div className="inline-flex items-center gap-0.5"><button type="button" onClick={(event) => { event.stopPropagation(); onMoveGoal(goal.id, "up"); }} className="grid h-5 w-5 place-items-center rounded-md text-[#7C8C83] transition hover:bg-[#E8F6F0] hover:text-[#087E5A]" title={`Mover ${goal.title} para cima`} aria-label={`Mover ${goal.title} para cima`}><ChevronUp size={12} /></button><button type="button" onClick={(event) => { event.stopPropagation(); onMoveGoal(goal.id, "down"); }} className="grid h-5 w-5 place-items-center rounded-md text-[#7C8C83] transition hover:bg-[#E8F6F0] hover:text-[#087E5A]" title={`Mover ${goal.title} para baixo`} aria-label={`Mover ${goal.title} para baixo`}><ChevronDown size={12} /></button></div></div>
               </article>;
             })}
             {goals.length === 0 && <button onClick={onNewGoal} className="flex min-h-[96px] items-center justify-center gap-2 rounded-xl border border-dashed border-[#C9DED0] bg-[#F5FBF7] text-sm font-bold text-[#087E5A]"><CirclePlus size={17} />Criar primeira meta</button>}
@@ -2059,16 +2066,16 @@ function GoalSimulator({ stages, services, funnels, onAddStage, onUpdateStage, o
   const projections = useMemo(() => {
     let previousVolume = simulationBase;
     return stages.map((stage, index) => {
-      const mode = stage.projectionMode ?? "percentual";
+      const mode = normalizeSimulationProjectionMode(stage.projectionMode);
       const product = services.find((service) => service.id === (stage.productId ?? ""));
       const conversionStage = funnelStages.find((funnelStage) => funnelStage.id === (stage.conversionStageId ?? ""));
       const configuredRate = Math.min(100, Math.max(0, Number(stage.conversionRate ?? stage.probability) || 0));
-      const rate = mode === "produto" ? conversionStage?.probability ?? 0 : mode === "fixo" ? configuredRate : index === 0 ? 100 : Math.min(100, Math.max(0, Number(stage.probability) || 0));
+      const rate = mode === "produto" ? conversionStage?.probability ?? 0 : index === 0 ? 100 : configuredRate;
       const volume = index === 0 ? simulationBase : previousVolume * (rate / 100);
       const revenueUnit = mode === "fixo" && stage.revenueBase === "ticket" ? Math.max(0, Number(stage.averageTicket) || 0) : product?.price ?? 0;
-      const projected = index === 0 ? volume : mode === "fixo" ? volume * revenueUnit : mode === "produto" ? volume * revenueUnit : volume;
+      const projected = index === 0 ? volume : volume * revenueUnit;
       previousVolume = volume;
-      const displayUnit = mode === "percentual" ? "volume" as const : "currency" as const;
+      const displayUnit = index === 0 ? "volume" as const : "currency" as const;
       return { stage, mode, rate, volume, projected, displayUnit, product, conversionStage, revenueUnit };
     });
   }, [funnelStages, services, simulationBase, stages]);
@@ -2085,20 +2092,20 @@ function GoalSimulator({ stages, services, funnels, onAddStage, onUpdateStage, o
         <div className="simulator-stage-list">{stages.map((stage, index) => {
           const projection = projectionByStage.get(stage.id);
           const isEditing = editingStageId === stage.id;
-          const mode = stage.projectionMode ?? "percentual";
+          const mode = normalizeSimulationProjectionMode(stage.projectionMode);
           const selectedProduct = services.find((service) => service.id === (stage.productId ?? ""));
           const selectedConversionStage = funnelStages.find((funnelStage) => funnelStage.id === (stage.conversionStageId ?? ""));
           return <article key={stage.id} className="simulator-stage rounded-xl border border-[#E0E9E1] bg-[#FCFDFC] p-2.5 transition hover:border-[#BFD8C9]">
             <div className="flex items-center gap-2"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-[#EEF7F0] text-[10px] font-extrabold text-[#5B7868]">{String(index + 1).padStart(2, "0")}</span><span className="h-2.5 w-2.5 shrink-0 rounded-full ring-4 ring-[#F1F6F1]" style={{ backgroundColor: stage.color }} /><div className="min-w-0 flex-1">{isEditing ? <Input autoFocus value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveName(stage); if (event.key === "Escape") setEditingStageId(null); }} className="h-8 bg-white text-xs font-bold" /> : <div className="flex min-w-0 flex-wrap items-center gap-1.5"><h3 className="truncate text-sm font-extrabold tracking-[-0.02em] text-[#27302D]">{stage.name}</h3>{isWonStage(stage) && <span className="rounded-full bg-[#E7F5EF] px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-[0.08em] text-[#087E5A]">Fechamento</span>}</div>}<p className="truncate text-[9px] font-medium text-[#829089]">{index === 0 ? "Entrada fixa do cenário" : "Regra de projeção"}</p></div><div className="flex shrink-0 items-center gap-0.5"><button type="button" onClick={() => isEditing ? saveName(stage) : startEditing(stage)} className="grid h-7 w-7 place-items-center rounded-lg text-[#718078] transition hover:bg-[#E8F6F0] hover:text-[#087E5A]" title={isEditing ? "Salvar nome" : "Editar etapa"} aria-label={isEditing ? `Salvar nome de ${stage.name}` : `Editar ${stage.name}`}>{isEditing ? <CheckCircle2 size={14} /> : <Pencil size={14} />}</button>{isEditing && <button type="button" onClick={() => setEditingStageId(null)} className="grid h-7 w-7 place-items-center rounded-lg text-[#718078] hover:bg-[#F6EAE8] hover:text-[#B44D46]" title="Cancelar edição" aria-label="Cancelar edição"><X size={14} /></button>}<button type="button" onClick={() => onDeleteStage(stage.id)} disabled={stages.length <= 2} className="grid h-7 w-7 place-items-center rounded-lg text-[#9C6D69] transition hover:bg-[#F6EAE8] hover:text-[#B44D46] disabled:cursor-not-allowed disabled:opacity-30" title={stages.length <= 2 ? "Mantenha pelo menos duas etapas" : "Excluir etapa"} aria-label={`Excluir ${stage.name}`}><Trash2 size={14} /></button></div></div>
             {index === 0 ? <div className="simulator-entry-result mt-2 flex items-center justify-between gap-2 rounded-lg border border-[#DDEBE1] bg-[#F4FAF6] px-2 py-1.5"><div className="flex items-center gap-2"><input type="color" value={stage.color} onChange={(event) => onUpdateStage(stage.id, "color", event.target.value)} className="h-6 w-8 cursor-pointer rounded-md border border-[#D7E4DA] bg-white p-0.5" aria-label={`Cor de ${stage.name}`} /><span className="text-[10px] font-semibold text-[#5F7468]">Entrada em 100%</span></div><strong className="font-display text-sm tracking-[-0.04em] text-[#087E5A]">{formatSimulationValue(leads)} leads</strong></div> : <>
-              <div className="simulator-stage-controls mt-2 grid gap-2 lg:grid-cols-[140px_minmax(0,1fr)]"><label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Método</span><select value={mode} onChange={(event) => onUpdateStage(stage.id, "projectionMode", event.target.value as SimulationProjectionMode)} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-bold text-[#34423B] outline-none transition focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15"><option value="percentual">Percentual</option><option value="fixo">Receita por conversão</option><option value="produto">Produto × conversão</option></select></label><div className="simulator-stage-fields rounded-lg border border-[#E5EBE5] bg-[#FBFCFA] p-1.5"><div className="simulator-field-grid grid gap-1.5 sm:grid-cols-2">{mode === "percentual" && <label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Conversão</span><div className="relative"><Input min="0" max="100" step="0.1" type="number" value={stage.probability} onChange={(event) => onUpdateStage(stage.id, "probability", event.target.value)} className="h-8 bg-white pr-7 text-right text-xs font-extrabold" /><span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#7C8A83]">%</span></div></label>}{(mode === "fixo" || mode === "produto") && <>{mode === "fixo" && <label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Conversão</span><div className="relative"><Input min="0" max="100" step="0.1" type="number" value={stage.conversionRate ?? stage.probability} onChange={(event) => onUpdateStage(stage.id, "conversionRate", event.target.value)} className="h-8 bg-white pr-7 text-right text-xs font-extrabold" /><span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#7C8A83]">%</span></div></label>}{mode === "fixo" && <label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Base de receita</span><select value={stage.revenueBase ?? "produto"} onChange={(event) => onUpdateStage(stage.id, "revenueBase", event.target.value)} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-semibold text-[#34423B] outline-none focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15"><option value="produto">Produto do catálogo</option><option value="ticket">Ticket médio</option></select></label>}{mode === "fixo" && (stage.revenueBase ?? "produto") === "produto" && <label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Serviço</span><select value={stage.productId ?? ""} onChange={(event) => onUpdateStage(stage.id, "productId", event.target.value)} disabled={!services.length} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-semibold text-[#34423B] outline-none focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15 disabled:bg-[#F0F3F0]"><option value="">{services.length ? "Selecione" : "Cadastre um serviço"}</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name} · {formatCurrency(service.price)}</option>)}</select></label>}{mode === "fixo" && (stage.revenueBase ?? "produto") === "ticket" && <label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Ticket médio</span><div className="relative"><span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#7C8A83]">R$</span><Input min="0" step="0.01" type="number" value={stage.averageTicket ?? 0} onChange={(event) => onUpdateStage(stage.id, "averageTicket", event.target.value)} className="h-8 bg-white pl-7 text-right text-xs font-extrabold" /></div></label>}{mode === "produto" && <><label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Produto</span><select value={stage.productId ?? ""} onChange={(event) => onUpdateStage(stage.id, "productId", event.target.value)} disabled={!services.length} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-semibold text-[#34423B] outline-none focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15 disabled:bg-[#F0F3F0]"><option value="">{services.length ? "Selecione" : "Cadastre um serviço"}</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name} · {formatCurrency(service.price)}</option>)}</select></label><label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Etapa de conversão</span><select value={stage.conversionStageId ?? ""} onChange={(event) => onUpdateStage(stage.id, "conversionStageId", event.target.value)} disabled={!funnelStages.length} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-semibold text-[#34423B] outline-none focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15 disabled:bg-[#F0F3F0]"><option value="">{funnelStages.length ? "Selecione" : "Cadastre uma etapa"}</option>{funnelStages.map((funnelStage) => <option key={funnelStage.id} value={funnelStage.id}>{funnelStage.funnelName} · {funnelStage.name} · {funnelStage.probability}%</option>)}</select></label></>}</>}</div></div></div>
-              <div className="simulator-result mt-1.5 flex items-center justify-between gap-2 rounded-lg border border-[#E8EDE8] bg-[#F8FAF8] px-2 py-1.5"><div className="flex min-w-0 items-center gap-2"><input type="color" value={stage.color} onChange={(event) => onUpdateStage(stage.id, "color", event.target.value)} className="h-6 w-8 cursor-pointer rounded-md border border-[#D7E4DA] bg-white p-0.5" aria-label={`Cor de ${stage.name}`} /><div className="min-w-0"><p className="text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#85928B]">Resultado</p><p className="truncate text-[10px] font-medium text-[#6E7D75]">{mode === "produto" ? `${selectedProduct?.name ?? "Produto não selecionado"} · ${selectedConversionStage ? `${selectedConversionStage.name} ${selectedConversionStage.probability}%` : "Etapa não selecionada"}` : mode === "fixo" ? `${formatSimulationValue(projection?.volume ?? 0)} negócios × ${formatCurrency(projection?.revenueUnit ?? 0)}` : `${stage.probability}% da etapa anterior`}</p></div></div><strong className="shrink-0 font-display text-sm tracking-[-0.04em] text-[#087E5A]">{projection?.displayUnit === "currency" ? formatCurrency(projection.projected) : `${formatSimulationValue(projection?.projected ?? 0)} leads`}</strong></div>
+              <div className="simulator-stage-controls mt-2 grid gap-2 lg:grid-cols-[140px_minmax(0,1fr)]"><label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Método</span><select value={mode} onChange={(event) => onUpdateStage(stage.id, "projectionMode", event.target.value as SimulationProjectionMode)} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-bold text-[#34423B] outline-none transition focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15"><option value="fixo">Valor fixo</option><option value="produto">Valor financeiro</option></select></label><div className="simulator-stage-fields rounded-lg border border-[#E5EBE5] bg-[#FBFCFA] p-1.5"><div className="simulator-field-grid grid gap-1.5 sm:grid-cols-2">{(mode === "fixo" || mode === "produto") && <>{mode === "fixo" && <label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Conversão</span><div className="relative"><Input min="0" max="100" step="0.1" type="number" value={stage.conversionRate ?? stage.probability} onChange={(event) => onUpdateStage(stage.id, "conversionRate", event.target.value)} className="h-8 bg-white pr-7 text-right text-xs font-extrabold" /><span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#7C8A83]">%</span></div></label>}{mode === "fixo" && <label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Base de receita</span><select value={stage.revenueBase ?? "produto"} onChange={(event) => onUpdateStage(stage.id, "revenueBase", event.target.value)} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-semibold text-[#34423B] outline-none focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15"><option value="produto">Produto do catálogo</option><option value="ticket">Ticket médio</option></select></label>}{mode === "fixo" && (stage.revenueBase ?? "produto") === "produto" && <label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Serviço</span><select value={stage.productId ?? ""} onChange={(event) => onUpdateStage(stage.id, "productId", event.target.value)} disabled={!services.length} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-semibold text-[#34423B] outline-none focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15 disabled:bg-[#F0F3F0]"><option value="">{services.length ? "Selecione" : "Cadastre um serviço"}</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name} · {formatCurrency(service.price)}</option>)}</select></label>}{mode === "fixo" && (stage.revenueBase ?? "produto") === "ticket" && <label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Ticket médio</span><div className="relative"><span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#7C8A83]">R$</span><Input min="0" step="0.01" type="number" value={stage.averageTicket ?? 0} onChange={(event) => onUpdateStage(stage.id, "averageTicket", event.target.value)} className="h-8 bg-white pl-7 text-right text-xs font-extrabold" /></div></label>}{mode === "produto" && <><label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Produto</span><select value={stage.productId ?? ""} onChange={(event) => onUpdateStage(stage.id, "productId", event.target.value)} disabled={!services.length} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-semibold text-[#34423B] outline-none focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15 disabled:bg-[#F0F3F0]"><option value="">{services.length ? "Selecione" : "Cadastre um serviço"}</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name} · {formatCurrency(service.price)}</option>)}</select></label><label className="block"><span className="mb-1 block text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#73837A]">Etapa de conversão</span><select value={stage.conversionStageId ?? ""} onChange={(event) => onUpdateStage(stage.id, "conversionStageId", event.target.value)} disabled={!funnelStages.length} className="h-8 w-full rounded-lg border border-[#DCE6DD] bg-white px-2 text-[10px] font-semibold text-[#34423B] outline-none focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15 disabled:bg-[#F0F3F0]"><option value="">{funnelStages.length ? "Selecione" : "Cadastre uma etapa"}</option>{funnelStages.map((funnelStage) => <option key={funnelStage.id} value={funnelStage.id}>{funnelStage.funnelName} · {funnelStage.name} · {funnelStage.probability}%</option>)}</select></label></>}</>}</div></div></div>
+              <div className="simulator-result mt-1.5 flex items-center justify-between gap-2 rounded-lg border border-[#E8EDE8] bg-[#F8FAF8] px-2 py-1.5"><div className="flex min-w-0 items-center gap-2"><input type="color" value={stage.color} onChange={(event) => onUpdateStage(stage.id, "color", event.target.value)} className="h-6 w-8 cursor-pointer rounded-md border border-[#D7E4DA] bg-white p-0.5" aria-label={`Cor de ${stage.name}`} /><div className="min-w-0"><p className="text-[8px] font-extrabold uppercase tracking-[0.1em] text-[#85928B]">Resultado</p><p className="truncate text-[10px] font-medium text-[#6E7D75]">{mode === "produto" ? `${selectedProduct?.name ?? "Produto não selecionado"} · ${selectedConversionStage ? `${selectedConversionStage.name} ${selectedConversionStage.probability}%` : "Etapa não selecionada"}` : `${formatSimulationValue(projection?.volume ?? 0)} negócios × ${formatCurrency(projection?.revenueUnit ?? 0)}`}</p></div></div><strong className="shrink-0 font-display text-sm tracking-[-0.04em] text-[#087E5A]">{projection?.displayUnit === "currency" ? formatCurrency(projection.projected) : `${formatSimulationValue(projection?.projected ?? 0)} leads`}</strong></div>
             </>}
           </article>;
         })}</div>
-        <p className="mt-2 px-1 text-[9px] leading-4 text-[#829089]">Percentual encadeia volumes; Receita por conversão calcula negócios × serviço ou ticket; Produto × conversão estima receita pelo catálogo.</p>
+        <p className="mt-2 px-1 text-[9px] leading-4 text-[#829089]">Valor fixo calcula negócios × serviço ou ticket; Valor financeiro calcula a receita do produto pela conversão da etapa escolhida.</p>
       </div>
-      <aside className="simulator-reading sticky top-3 self-start rounded-xl border border-[#CFE3D6] bg-gradient-to-br from-[#EEF9F2] to-[#F8FCF8] p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#5D7569]">Leitura projetada</p><h3 className="mt-0.5 font-display text-base font-extrabold tracking-[-0.035em] text-[#24332D]">Cenário independente</h3></div><span className="rounded-full bg-white/80 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.08em] text-[#087E5A]">{numberFormat.format(leads)} entradas</span></div><div className="mt-2 space-y-1">{stages.map((stage, index) => { const projection = projectionByStage.get(stage.id); if (!projection) return null; return <div key={stage.id} className="flex items-center gap-2 rounded-lg border border-white/80 bg-white/55 px-2 py-1.5"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} /><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[#4B6257]">{stage.name}</p><p className="truncate text-[9px] font-semibold uppercase tracking-[0.07em] text-[#87968E]">{index === 0 ? "Base" : stage.projectionMode === "produto" ? "Receita estimada" : stage.projectionMode === "fixo" ? "Receita por conversão" : `${stage.probability}% conversão`}</p></div>{isWonStage(stage) && <span className="hidden rounded-full bg-[#E7F5EF] px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-[0.07em] text-[#087E5A] sm:inline-flex">Final</span>}<strong className="font-display text-sm tracking-[-0.04em] text-[#1B2522]">{projection.displayUnit === "currency" ? formatCurrency(projection.projected) : formatSimulationValue(projection.projected)}</strong></div>; })}</div><div className="mt-2 border-t border-[#CFE0D5] pt-2"><p className="text-[10px] font-bold text-[#4F6F60]">Métodos combináveis</p><p className="mt-0.5 text-[9px] leading-4 text-[#71887D]">Cada etapa pode usar uma regra diferente sem alterar o funil principal.</p></div></aside>
+      <aside className="simulator-reading sticky top-3 self-start rounded-xl border border-[#CFE3D6] bg-gradient-to-br from-[#EEF9F2] to-[#F8FCF8] p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#5D7569]">Leitura projetada</p><h3 className="mt-0.5 font-display text-base font-extrabold tracking-[-0.035em] text-[#24332D]">Cenário independente</h3></div><span className="rounded-full bg-white/80 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.08em] text-[#087E5A]">{numberFormat.format(leads)} entradas</span></div><div className="mt-2 space-y-1">{stages.map((stage, index) => { const projection = projectionByStage.get(stage.id); if (!projection) return null; return <div key={stage.id} className="flex items-center gap-2 rounded-lg border border-white/80 bg-white/55 px-2 py-1.5"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} /><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[#4B6257]">{stage.name}</p><p className="truncate text-[9px] font-semibold uppercase tracking-[0.07em] text-[#87968E]">{index === 0 ? "Base" : normalizeSimulationProjectionMode(stage.projectionMode) === "produto" ? "Valor financeiro" : "Valor fixo"}</p></div>{isWonStage(stage) && <span className="hidden rounded-full bg-[#E7F5EF] px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-[0.07em] text-[#087E5A] sm:inline-flex">Final</span>}<strong className="font-display text-sm tracking-[-0.04em] text-[#1B2522]">{projection.displayUnit === "currency" ? formatCurrency(projection.projected) : formatSimulationValue(projection.projected)}</strong></div>; })}</div><div className="mt-2 border-t border-[#CFE0D5] pt-2"><p className="text-[10px] font-bold text-[#4F6F60]">Métodos combináveis</p><p className="mt-0.5 text-[9px] leading-4 text-[#71887D]">Cada etapa pode usar uma regra diferente sem alterar o funil principal.</p></div></aside>
     </div>
   </section>;
 }
