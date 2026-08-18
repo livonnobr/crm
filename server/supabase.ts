@@ -167,6 +167,28 @@ export async function getWorkspaceSnapshot(workspaceId: string) {
 }
 
 
+export async function syncService(workspaceId: string, service: any) {
+  const supabase = getAdminClient();
+  const deadlineUnit = ["dias", "semanas", "meses"].includes(service?.deadlineUnit) ? service.deadlineUnit : "dias";
+  const pricingType = ["Fixo", "Mensal", "A partir de"].includes(service?.pricingType) ? service.pricingType : "Fixo";
+  const deadline = Math.min(3650, Math.max(1, Number(service?.deadline) || 1));
+  const price = Math.max(0, Number(service?.price) || 0);
+  const row = {
+    id: entityUuid(service?.id, "service"),
+    workspace_id: workspaceId,
+    name: String(service?.name ?? "Novo serviço").trim() || "Novo serviço",
+    deliverables: String(service?.deliverables ?? ""),
+    deadline,
+    deadline_unit: deadlineUnit,
+    price,
+    pricing_type: pricingType,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("services").upsert(row);
+  if (error) throw error;
+  return { ok: true as const, id: row.id };
+}
+
 export async function syncWorkspaceSnapshot(workspaceId: string, state: any) {
   const supabase = getAdminClient();
   const goals = Array.isArray(state.goals) ? state.goals : [];

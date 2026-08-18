@@ -2,7 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { ensureWorkspaceForSupabaseToken, getWorkspaceSnapshot, syncWorkspaceSnapshot } from "./supabase";
+import { ensureWorkspaceForSupabaseToken, getWorkspaceSnapshot, syncService, syncWorkspaceSnapshot } from "./supabase";
 import { z } from "zod";
 
 export const appRouter = router({
@@ -17,6 +17,10 @@ export const appRouter = router({
     sync: publicProcedure.input(z.object({ state: z.any() })).mutation(async ({ ctx, input }) => {
       const workspace = await ensureWorkspaceForSupabaseToken(ctx.req.headers.authorization);
       return syncWorkspaceSnapshot(workspace.workspaceId, input.state);
+    }),
+    syncService: publicProcedure.input(z.object({ service: z.any() })).mutation(async ({ ctx, input }) => {
+      const workspace = await ensureWorkspaceForSupabaseToken(ctx.req.headers.authorization);
+      return syncService(workspace.workspaceId, input.service);
     }),
   }),
 

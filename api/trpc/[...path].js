@@ -271,6 +271,27 @@ async function getWorkspaceSnapshot(workspaceId) {
   if (stagesError || opportunitiesError) throw stagesError ?? opportunitiesError;
   return { goals: goals ?? [], funnels: funnels ?? [], stages: stages ?? [], opportunities: opportunities ?? [], conversionSettings: conversionSettings ?? null, prospectLists: prospectLists ?? [], prospectRecords: prospectRecords ?? [], cadenceBlocks: cadenceBlocks ?? [], financeEntries: financeEntries ?? [], services: services ?? [], goalSimulationStages: goalSimulationStages ?? [] };
 }
+async function syncService(workspaceId, service) {
+  const supabase = getAdminClient();
+  const deadlineUnit = ["dias", "semanas", "meses"].includes(service?.deadlineUnit) ? service.deadlineUnit : "dias";
+  const pricingType = ["Fixo", "Mensal", "A partir de"].includes(service?.pricingType) ? service.pricingType : "Fixo";
+  const deadline = Math.min(3650, Math.max(1, Number(service?.deadline) || 1));
+  const price = Math.max(0, Number(service?.price) || 0);
+  const row = {
+    id: entityUuid(service?.id, "service"),
+    workspace_id: workspaceId,
+    name: String(service?.name ?? "Novo servi\xE7o").trim() || "Novo servi\xE7o",
+    deliverables: String(service?.deliverables ?? ""),
+    deadline,
+    deadline_unit: deadlineUnit,
+    price,
+    pricing_type: pricingType,
+    updated_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const { error } = await supabase.from("services").upsert(row);
+  if (error) throw error;
+  return { ok: true, id: row.id };
+}
 async function syncWorkspaceSnapshot(workspaceId, state) {
   const supabase = getAdminClient();
   const goals = Array.isArray(state.goals) ? state.goals : [];
@@ -434,6 +455,10 @@ var appRouter = router({
     sync: publicProcedure.input(z2.object({ state: z2.any() })).mutation(async ({ ctx, input }) => {
       const workspace = await ensureWorkspaceForSupabaseToken(ctx.req.headers.authorization);
       return syncWorkspaceSnapshot(workspace.workspaceId, input.state);
+    }),
+    syncService: publicProcedure.input(z2.object({ service: z2.any() })).mutation(async ({ ctx, input }) => {
+      const workspace = await ensureWorkspaceForSupabaseToken(ctx.req.headers.authorization);
+      return syncService(workspace.workspaceId, input.service);
     })
   }),
   auth: router({
