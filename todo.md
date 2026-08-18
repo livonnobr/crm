@@ -312,3 +312,5 @@
 - [x] Adicionar seletor mensal no painel de Metas e contabilizar negócios por eventos de etapa ocorridos no mês selecionado, sem reaparecer em meses posteriores
 
 - [x] Remover as frases verdes de vínculo automático dos cards de Metas, mantendo apenas os dados essenciais
+
+- [x] Aumentar o título de cada card de meta mantendo a responsividade e os controles atuais
