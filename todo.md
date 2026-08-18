@@ -225,3 +225,11 @@
 - [x] Adicionar ação nas listas de Empresas para escolher funil e etapa de destino.
 - [x] Converter cada registro da lista em um card individual, preservando dados comerciais relevantes.
 - [x] Validar duplicidade, persistência no Supabase, testes, build e publicação da integração Empresas-Funil.
+
+- [ ] Importar Financeiro-Agosto, Financeiro-Setembro, Financeiro-Outubro e Financeiro-Dívidas no painel Financeiro.
+- [ ] Mapear colunas, parcelas, vencimentos e evitar duplicidades na importação financeira.
+- [ ] Validar totais, persistência Supabase, testes, build e checkpoint da importação financeira.
+
+- [x] Adicionar a opção recorrente ao modelo e formulário de Metas.
+- [x] Aplicar metas recorrentes ao período atual sem criar registros duplicados.
+- [x] Validar persistência, cálculos, testes, build e publicação da recorrência.
