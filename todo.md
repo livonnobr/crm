@@ -325,3 +325,5 @@
 
 - [x] Criar um workspace técnico no Supabase crmsupa para associar a importação financeira, sem criar dados financeiros fictícios
 - [x] Importar os quatro CSVs financeiros no workspace do Supabase com proteção contra duplicidade e preservar valores não monetários como observação
+
+- [x] Adicionar no Funil uma visão ou campo dedicado para consultar os cards convertidos em vendas
