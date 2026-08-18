@@ -213,4 +213,4 @@
 - [ ] Substituir a confirmação nativa da exclusão de linhas em Empresas por uma confirmação visual não bloqueante e remover o registro temporário de validação.
 
 - [x] Substituir a confirmação nativa `window.confirm` da exclusão de linhas em Empresas por diálogo visual não bloqueante.
-- [x] Validar build, testes e publicação da confirmação visual de exclusão em Empresas.
+- [ ] Validar a publicação da confirmação visual de exclusão em Empresas no Netlify (deploy recusado por limite de créditos; GitHub sincronizado e build local validado).
