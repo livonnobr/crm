@@ -257,7 +257,7 @@
 - [ ] Subir as despesas dos CSVs anexados no projeto Supabase crmsupa.
 - [ ] Confirmar o mapeamento, evitar duplicidades e validar os totais no Financeiro após a carga.
 
-- [ ] Auditar divergências entre código local, GitHub `ritmo-crm`, projeto Vercel e banco crmsupa.
-- [ ] Sincronizar a versão validada do CRM no GitHub e Vercel, sem usar Netlify.
-- [ ] Criar ou identificar workspace correto no crmsupa e importar as despesas financeiras sem duplicidade.
-- [ ] Validar o estado final dos três destinos e documentar eventuais bloqueios de autenticação.
+- [x] Auditar divergências entre código local, GitHub `ritmo-crm`, projeto Vercel e banco crmsupa.
+- [x] Sincronizar a versão validada do CRM no GitHub e Vercel, sem usar Netlify.
+- [ ] Criar ou identificar workspace correto no crmsupa e importar as despesas financeiras sem duplicidade (bloqueado: crmsupa ainda não possui workspace/lançamentos).
+- [x] Validar o estado final dos três destinos e documentar eventuais bloqueios de autenticação.
