@@ -147,18 +147,44 @@
   .goal-meter { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(#10A97A var(--progress), #E8ECE7 0); position: relative; }
   .goal-meter::before { content: ""; position: absolute; inset: 5px; border-radius: 9999px; background: #FCFCFA; }
   .goal-meter span { position: relative; z-index: 1; font-size: 10px; font-weight: 800; color: #087E5A; }
-  .goals-page { min-height: 100%; background: linear-gradient(180deg, #F8FAF7 0%, #F4F6F2 28%, #F4F6F2 100%); }
-  .goals-page > header { box-shadow: 0 1px 0 rgba(35,54,43,.025); }
-  .goal-compact-card { @apply rounded-xl border border-[#E2E9E2] bg-[#FCFCFA] p-3 shadow-[0_5px_14px_rgba(35,54,43,0.04)] transition duration-150 hover:-translate-y-0.5 hover:border-[#BFD6C8] hover:shadow-[0_8px_20px_rgba(35,54,43,0.07)]; }
+  .goals-page { min-height: 100%; background: #F4F6F2; }
+  .goals-header { border-bottom: 1px solid #E1E8E2; }
+  .goals-header-inner, .goals-content { max-width: 1500px; margin-inline: auto; }
+  .goals-content { position: relative; }
+  .goals-overview { min-width: 0; }
+  .goals-overview-head { padding-inline: .15rem; }
+  .goals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .7rem; align-items: start; }
+  .goal-compact-card { @apply rounded-[14px] border border-[#DDE7DF] bg-[#FFFFFF] p-3 shadow-[0_3px_12px_rgba(35,54,43,0.025)] transition duration-150 hover:-translate-y-0.5 hover:border-[#B5D2C0] hover:shadow-[0_8px_18px_rgba(35,54,43,0.06)]; }
+  .goal-card-main { display: flex; min-width: 0; align-items: center; gap: .65rem; margin-top: .65rem; }
+  .goal-card-progress { height: 3px; margin-top: .7rem; overflow: hidden; border-radius: 999px; background: #EDF1ED; }
+  .goal-card-progress-bar { height: 100%; border-radius: inherit; background: #10A97A; transition: width 180ms ease; }
+  .goal-card-foot { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .55rem; padding-top: .5rem; border-top: 1px solid #F0F3EF; }
+  .goal-card-foot > span { color: #A0ACA5; }
+  .goal-card-foot > span svg { opacity: .7; }
   .goal-meter-compact { width: 36px; height: 36px; }
   .goal-meter-compact::before { inset: 4px; }
   .goal-meter-compact span { font-size: 9px; }
-  .calendar-compact-card { min-height: 0; }
-  .simulator-panel { @apply border-[#D9E7DE] bg-[#F7FBF8] shadow-[0_10px_28px_rgba(35,54,43,0.04)]; }
+  .calendar-compact-card { min-width: 0; align-self: start; border: 1px solid #E7D9B5; border-radius: 16px; background: #FFFDF7; padding: .85rem; box-shadow: 0 5px 16px rgba(142,105,31,.06); }
+  .calendar-compact-card > div:last-child { border-color: #EFE2C2; background: #FFFBF1; }
+  .goals-cadence-surface { min-width: 0; }
+  .planos-cadence { border: 0 !important; border-radius: 0 !important; background: transparent !important; }
+  .planos-cadence > .cadence-inner { padding-inline: 0; padding-top: .25rem; padding-bottom: 0; }
+  .planos-cadence h1 { font-size: 1.05rem; letter-spacing: -.045em; }
+  .cadence-board { border-radius: 16px !important; box-shadow: none !important; }
+  .cadence-header { background: #EDF4EE !important; color: #315C4D !important; }
+  .cadence-header > div { border-color: #D7E4D9 !important; }
+  .cadence-header > div:first-child, .cadence-header > div > div { color: #557267 !important; }
+  .cadence-cell { min-height: 118px !important; padding: .4rem !important; }
+  .cadence-block, .cadence-empty { min-height: 104px !important; border-radius: 14px !important; padding: .55rem !important; }
+  .cadence-block > div:first-child { margin-bottom: .45rem !important; }
+  .cadence-block > div:first-child > div { height: 44px !important; width: 44px !important; border-radius: 14px !important; box-shadow: none !important; }
+  .cadence-block > div:first-child > div svg { width: 24px; height: 24px; }
+  .cadence-block > p { font-size: 12px; }
+  .cadence-block > p + p { margin-top: .3rem !important; font-size: 10px; line-height: 1.25; }
+  .cadence-block > div:last-child { padding-top: .45rem !important; }
+  .simulator-panel { @apply border-[#D9E7DE] bg-[#F7FBF8] shadow-[0_8px_22px_rgba(35,54,43,0.035)]; }
   .simulator-stage { @apply border-[#E0E9E1] bg-[#FCFDFC] shadow-[0_2px_8px_rgba(35,54,43,0.02)]; }
   .simulator-reading { @apply border-[#CFE3D6] shadow-[0_8px_20px_rgba(35,54,43,0.035)]; }
-  .planos-cadence > div { padding-top: 0.75rem; padding-bottom: 0.75rem; }
-  .planos-cadence h1 { font-size: 1.25rem; }
   .pulse-dot { @apply h-2 w-2 rounded-full bg-[#8DE2C4] shadow-[0_0_0_4px_rgba(141,226,196,0.13)]; }
 }
 

@@ -1983,8 +1983,8 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
   }, [selectedMonth]);
 
   return <div className="goals-page pt-[68px] md:pt-0">
-    <header className="border-b border-[#E4EBE5] bg-[#F8FAF7]">
-      <div className="flex min-h-[82px] items-center justify-between gap-4 px-5 py-3 md:px-10">
+    <header className="goals-header bg-transparent">
+      <div className="goals-header-inner flex min-h-[72px] items-center justify-between gap-4 px-5 py-3 md:px-10">
         <div className="min-w-0">
           <p className="eyebrow">Planejamento comercial</p>
           <h1 className="page-title !mt-0 text-[26px] sm:text-[30px]">Planos e Metas</h1>
@@ -2000,14 +2000,14 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
       </div>
     </header>
 
-    <div className="space-y-3 px-5 pb-8 pt-3 md:px-10">
+    <main className="goals-content space-y-4 px-5 pb-10 pt-2 md:px-10">
       <section className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_300px]" aria-label="Metas do período e fechamento do mês">
-        <div className="rounded-[18px] border border-[#E0E8E1] bg-[#FBFCFA] p-3 shadow-[0_8px_24px_rgba(35,54,43,0.035)]">
-          <div className="mb-2.5 flex items-center justify-between gap-3">
+        <div className="goals-overview">
+          <div className="goals-overview-head mb-2.5 flex items-center justify-between gap-3">
             <div className="min-w-0"><p className="eyebrow">Metas do período</p><p className="mt-0.5 text-xs font-semibold text-[#6F7E75]">Acompanhe o avanço sem perder o ritmo.</p></div>
             <div className="shrink-0 rounded-full border border-[#D8E9DF] bg-[#F0F8F3] px-2.5 py-1 text-[10px] font-extrabold text-[#087E5A]">Média {averageGoalProgress}%</div>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="goals-grid">
             {goals.map((goal) => {
               const displayGoal = goalValuesForMonth(goal, selectedMonth);
               const progress = progressOf(displayGoal);
@@ -2017,27 +2017,28 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
                   <div className="flex min-w-0 items-center gap-1.5"><span className="pulse-dot h-1.5 w-1.5 shadow-[0_0_0_3px_rgba(141,226,196,0.13)]" /><span className="truncate text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#718078]">{goal.cadence}</span>{goal.recurring && <span className="rounded-full bg-[#E7F5EF] px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-[0.08em] text-[#087E5E]">Recorrente</span>}</div>
                   <div className="flex items-center gap-0.5"><span className="mr-1 text-[10px] font-extrabold text-[#087E5A]">{progress}%</span><button type="button" onClick={() => onEditGoal(goal)} className="icon-button h-6 w-6 opacity-60 transition hover:opacity-100" aria-label={`Editar ${goal.title}`}><Pencil size={12} /></button><button type="button" onClick={() => onDeleteGoal(goal.id)} className="icon-button h-6 w-6 text-[#B04D45] opacity-60 transition hover:opacity-100" aria-label={`Excluir ${goal.title}`}><Trash2 size={12} /></button></div>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="goal-card-main">
                   <div className="goal-meter goal-meter-compact shrink-0" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div>
                   <div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold tracking-[-0.02em] text-[#27302D]">{goal.title}</p><p className="mt-0.5 font-display text-[19px] font-extrabold tracking-[-0.055em] text-[#1B2522]">{formatGoalValue(displayGoal.actual, displayGoal.unit)}<span className="ml-1 text-[11px] font-bold text-[#85918B]">/ {formatGoalValue(displayGoal.target, displayGoal.unit)}</span></p></div>
                 </div>
-                <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#E8ECE7]"><div className="h-full rounded-full bg-[#10A97A] transition-[width]" style={{ width: `${progress}%` }} /></div>
-                <div className="mt-1.5 flex items-center justify-between gap-2"><p className="text-[9px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, displayGoal.unit)}</p><span className="inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.1em] text-[#A0ACA5]" title="Arraste para reorganizar"><GripVertical size={11} />Mover</span></div>
+                <div className="goal-card-progress"><div className="goal-card-progress-bar" style={{ width: `${progress}%` }} /></div>
+                <div className="goal-card-foot"><p className="text-[9px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, displayGoal.unit)}</p><span className="inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.1em] text-[#A0ACA5]" title="Arraste para reorganizar"><GripVertical size={11} />Mover</span></div>
               </article>;
             })}
             {goals.length === 0 && <button onClick={onNewGoal} className="flex min-h-[96px] items-center justify-center gap-2 rounded-xl border border-dashed border-[#C9DED0] bg-[#F5FBF7] text-sm font-bold text-[#087E5A]"><CirclePlus size={17} />Criar primeira meta</button>}
           </div>
         </div>
 
-        <aside className="calendar-compact-card rounded-[18px] border border-[#E5BE6B] bg-[#FFF4D9] p-3 shadow-[0_8px_24px_rgba(196,141,35,0.1)]">
+        <aside className="calendar-compact-card">
           <div className="flex items-start justify-between gap-2"><div><div className="flex items-center gap-1.5"><span className="pulse-dot h-1.5 w-1.5 bg-[#C88920] shadow-[0_0_0_3px_rgba(200,137,32,0.12)]" /><span className="text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#8A651D]">Fechamento do mês</span></div><p className="mt-1 font-display text-[19px] font-extrabold leading-none tracking-[-0.06em] text-[#6B4D12]">{daysRemaining} {daysRemaining === 1 ? "dia útil" : "dias úteis"}</p><p className="mt-0.5 text-[9px] font-semibold capitalize text-[#8A6D2A]">restantes em {currentMonth}</p></div><span className="rounded-full bg-[#FFF8E8] px-2 py-1 text-[8px] font-extrabold uppercase tracking-[0.08em] text-[#A87520]">Calendário</span></div>
           <div className="mt-2 rounded-xl border border-[#E7C983] bg-[#FFF8E8] p-1.5"><div className="grid grid-cols-7 gap-x-1 gap-y-0.5 text-center text-[8px] font-bold leading-3 text-[#A87520]"><div className="contents">{["S", "T", "Q", "Q", "S", "S", "D"].map((day, index) => <span key={`weekday-${index}`} className={`text-[8px] uppercase tracking-[0.1em] ${index >= 5 ? "font-black text-[#C62828]" : "text-[#8C641D]"}`}>{day}</span>)}</div>{calendar.days.map((day, index) => { const date = day === null ? null : new Date(calendar.year, calendar.month - 1, day); const isWeekend = Boolean(date && (date.getDay() === 0 || date.getDay() === 6)); const isHoliday = Boolean(date && calendar.holidays.has(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`)); const isRedDay = isWeekend || isHoliday; const isToday = Boolean(date && day === new Date().getDate() && selectedMonth === new Date().toISOString().slice(0, 7)); return <span key={`day-${index}`} title={isHoliday ? "Feriado nacional" : isWeekend ? "Fim de semana" : undefined} className={`rounded-md py-0.5 ${isToday ? isRedDay ? "bg-[#C62828] font-black text-white ring-1 ring-[#A61B1B] shadow-sm" : "bg-[#E5BE6B] text-[#5E4310] shadow-sm" : isRedDay ? "bg-[#FFE6E3] font-black text-[#B42318]" : "text-[#A87520]"}`}>{day ?? ""}</span>; })}</div></div>
         </aside>
       </section>
 
-      <div className="rounded-[18px] border border-[#E0E8E1] bg-[#FBFCFA] p-3 shadow-[0_8px_24px_rgba(35,54,43,0.03)]"><CadenceWorkspace blocks={cadenceBlocks} onAdd={onAddCadenceBlock} onMove={onMoveCadenceBlock} onEdit={onEditCadenceBlock} onDelete={onDeleteCadenceBlock} /></div>
+      <section className="goals-cadence-surface"><CadenceWorkspace blocks={cadenceBlocks} onAdd={onAddCadenceBlock} onMove={onMoveCadenceBlock} onEdit={onEditCadenceBlock} onDelete={onDeleteCadenceBlock} />
+      </section>
       <GoalSimulator stages={simulationStages} services={services} funnels={funnels} onAddStage={onAddSimulationStage} onUpdateStage={onUpdateSimulationStage} onDeleteStage={onDeleteSimulationStage} onSave={onSave} isSaving={isSaving} syncConfirmed={syncConfirmed} />
-    </div>
+    </main>
   </div>;
 }
 
@@ -2249,18 +2250,18 @@ function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks:
   const saveDraft = () => { if (draft?.title.trim()) { if (createSlot) { onAdd(createSlot.day, createSlot.slot, { title: draft.title, channel: draft.channel, notes: draft.notes }); } else { onEdit(draft); } setDraft(null); setCreateSlot(null); } };
 
   return <section className="planos-cadence mt-0 overflow-hidden rounded-[14px] border border-[#E0E5DF] bg-[#FBFBF9] shadow-none">
-    <div className="mx-auto max-w-[1500px] px-4 pb-4 pt-4 md:px-5 md:pb-5">
+    <div className="cadence-inner mx-auto max-w-[1500px] px-4 pb-4 pt-4 md:px-5 md:pb-5">
       <div className="mb-4">
         <h1 className="font-display text-3xl font-extrabold tracking-[-0.06em] text-[#1B2522]">Cadência de prospecção</h1>
       </div>
-      <div className="overflow-hidden rounded-[24px] border border-[#E0E5DF] bg-[#FBFBF9] shadow-[0_18px_50px_rgba(27,37,34,0.06)]">
-        <div className="overflow-x-auto">
-          <div className="min-w-[1120px]">
-            <div className="grid grid-cols-[112px_repeat(10,minmax(100px,1fr))] border-b border-[#E3E6E0] bg-[#18201E] text-white">
+      <div className="cadence-board overflow-hidden rounded-[24px] border border-[#E0E5DF] bg-[#FBFBF9] shadow-[0_18px_50px_rgba(27,37,34,0.06)]">
+        <div className="cadence-scroll overflow-x-auto">
+          <div className="cadence-grid min-w-[1120px]">
+            <div className="cadence-header grid grid-cols-[112px_repeat(10,minmax(100px,1fr))] border-b border-[#E3E6E0] bg-[#18201E] text-white">
               <div className="flex items-center px-4 py-4 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#B9D7CA]">Turno</div>
               {weekdays.map((weekday, index) => <div key={index} className="border-l border-white/10 px-3 py-3 text-center"><div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#B9D7CA]">Dia {String(index + 1).padStart(2, "0")}</div><div className="mt-1 text-xs font-bold capitalize">{weekday}</div></div>)}
             </div>
-            {(["morning", "afternoon"] as CadenceSlot[]).map((slot) => <div key={slot} className="grid grid-cols-[112px_repeat(10,minmax(100px,1fr))] border-b border-[#E3E6E0] last:border-b-0"><div className="flex items-center bg-[#EFF4EF] px-4 text-xs font-extrabold uppercase tracking-[0.08em] text-[#315C4D]">{slotLabel[slot]}</div>{Array.from({ length: 10 }, (_, index) => { const day = index + 1; const block = blockAt(day, slot); return <div key={day} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { if (block) return; const id = event.dataTransfer?.getData("text/plain"); if (id) onMove(id, day, slot); }} className="min-h-[172px] border-l border-[#E3E6E0] bg-[#FCFCFA] p-2 transition-colors hover:bg-[#F3F8F4]">{block ? <div draggable onDragStart={(event) => { event.dataTransfer.setData("text/plain", block.id); }} onDoubleClick={() => beginEdit(block)} className="group relative flex h-full min-h-[150px] cursor-grab flex-col items-center rounded-2xl border border-[#CFE6DA] bg-[#E8F6F0] p-3 text-center shadow-[0_8px_18px_rgba(16,169,122,0.08)] active:cursor-grabbing"><div className="mb-3 flex w-full justify-center"><div title={block.channel} aria-label={`Canal: ${block.channel}`} className={`grid h-16 w-16 place-items-center rounded-[22px] border shadow-[0_8px_16px_rgba(27,37,34,0.08)] ${channelIconTone[block.channel]}`}>{(() => { const Icon = channelIcon[block.channel]; return <Icon size={34} strokeWidth={2.35} aria-hidden="true" />; })()}</div></div><p className="text-sm font-extrabold leading-tight text-[#1B2522]">{block.title}</p>{block.notes && <p className="mt-2 line-clamp-3 text-[11px] font-medium leading-4 text-[#577066]">{block.notes}</p>}<div className="mt-auto flex items-center justify-center gap-3 pt-3 text-[10px] font-bold text-[#087E5E]"><button onClick={(event) => { event.stopPropagation(); beginEdit(block); }} className="opacity-0 transition-opacity group-hover:opacity-100">Editar</button><button onClick={(event) => { event.stopPropagation(); onDelete(block.id); }} className="text-[#B04A43] opacity-0 transition-opacity group-hover:opacity-100">Excluir</button></div></div> : <button onClick={() => openCreate(day, slot)} className="flex h-full min-h-[150px] w-full flex-col items-center justify-center rounded-2xl border border-dashed border-[#D7DFD8] text-[#A0AAA4] transition hover:border-[#10A97A] hover:bg-[#F3F8F4] hover:text-[#087E5A]"><Plus size={18} /><span className="mt-2 text-[10px] font-bold">Adicionar ação</span></button>}</div>; })}</div>)}
+            {(["morning", "afternoon"] as CadenceSlot[]).map((slot) => <div key={slot} className="grid grid-cols-[112px_repeat(10,minmax(100px,1fr))] border-b border-[#E3E6E0] last:border-b-0"><div className="flex items-center bg-[#EFF4EF] px-4 text-xs font-extrabold uppercase tracking-[0.08em] text-[#315C4D]">{slotLabel[slot]}</div>{Array.from({ length: 10 }, (_, index) => { const day = index + 1; const block = blockAt(day, slot); return <div key={day} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { if (block) return; const id = event.dataTransfer?.getData("text/plain"); if (id) onMove(id, day, slot); }} className="cadence-cell min-h-[172px] border-l border-[#E3E6E0] bg-[#FCFCFA] p-2 transition-colors hover:bg-[#F3F8F4]">{block ? <div draggable onDragStart={(event) => { event.dataTransfer.setData("text/plain", block.id); }} onDoubleClick={() => beginEdit(block)} className="cadence-block group relative flex h-full min-h-[150px] cursor-grab flex-col items-center rounded-2xl border border-[#CFE6DA] bg-[#E8F6F0] p-3 text-center shadow-[0_8px_18px_rgba(16,169,122,0.08)] active:cursor-grabbing"><div className="mb-3 flex w-full justify-center"><div title={block.channel} aria-label={`Canal: ${block.channel}`} className={`grid h-16 w-16 place-items-center rounded-[22px] border shadow-[0_8px_16px_rgba(27,37,34,0.08)] ${channelIconTone[block.channel]}`}>{(() => { const Icon = channelIcon[block.channel]; return <Icon size={34} strokeWidth={2.35} aria-hidden="true" />; })()}</div></div><p className="text-sm font-extrabold leading-tight text-[#1B2522]">{block.title}</p>{block.notes && <p className="mt-2 line-clamp-3 text-[11px] font-medium leading-4 text-[#577066]">{block.notes}</p>}<div className="mt-auto flex items-center justify-center gap-3 pt-3 text-[10px] font-bold text-[#087E5E]"><button onClick={(event) => { event.stopPropagation(); beginEdit(block); }} className="opacity-0 transition-opacity group-hover:opacity-100">Editar</button><button onClick={(event) => { event.stopPropagation(); onDelete(block.id); }} className="text-[#B04A43] opacity-0 transition-opacity group-hover:opacity-100">Excluir</button></div></div> : <button onClick={() => openCreate(day, slot)} className="cadence-empty flex h-full min-h-[150px] w-full flex-col items-center justify-center rounded-2xl border border-dashed border-[#D7DFD8] text-[#A0AAA4] transition hover:border-[#10A97A] hover:bg-[#F3F8F4] hover:text-[#087E5A]"><Plus size={18} /><span className="mt-2 text-[10px] font-bold">Adicionar ação</span></button>}</div>; })}</div>)}
           </div>
         </div>
       </div>
