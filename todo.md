@@ -318,3 +318,5 @@
 - [x] Adicionar um calendário visual do mês como fundo do card Fechamento do mês, preservando contraste e legibilidade
 
 - [x] Permitir personalizar uma meta recorrente apenas no mês selecionado, preservando a regra recorrente nos demais meses e persistindo a exceção
+
+- [ ] Antes de continuar o Financeiro, sincronizar todas as modificações locais pendentes com GitHub e Vercel e confirmar o deploy de produção
