@@ -83,6 +83,7 @@ type ProspectRecord = {
   id: string;
   decisionMakerFirstName: string;
   decisionMakerLastName: string;
+  decisionMakerRole: string;
   decisionMakerEmail: string;
   decisionMakerPhone: string;
   company: string;
@@ -211,7 +212,7 @@ type GoalRecord = {
 
 type ConversionSettingsRecord = { workspace_id: string; rates: ConversionRates };
 type ProspectListRow = { id: string; workspace_id: string; name: string; deleted_at: string | null };
-type ProspectRecordRow = { id: string; list_id: string; decision_maker_first_name: string; decision_maker_last_name: string; decision_maker_email: string; decision_maker_phone: string; company: string; company_website: string; analysis: string; position: number };
+type ProspectRecordRow = { id: string; list_id: string; decision_maker_first_name: string; decision_maker_last_name: string; decision_maker_role: string | null; decision_maker_email: string; decision_maker_phone: string; company: string; company_website: string; analysis: string; position: number };
 type FunnelRecord = { id: string; name: string; currency: string; position: number };
 type StageRecord = { id: string; funnel_id: string; name: string; color: string; probability: number; position: number };
 type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null;   notes?: DealNote[] | null; stage_history?: string[] | null };
@@ -380,6 +381,7 @@ const blankProspect: ProspectRecord = {
   id: "",
   decisionMakerFirstName: "",
   decisionMakerLastName: "",
+  decisionMakerRole: "",
   decisionMakerEmail: "",
   decisionMakerPhone: "",
   company: "",
@@ -595,7 +597,7 @@ export default function Home() {
     const prospectRecordsByList = new Map<string, ProspectRecord[]>();
     ((prospectRecordRows ?? []) as ProspectRecordRow[]).forEach((record) => {
       const current = prospectRecordsByList.get(record.list_id) ?? [];
-      current.push({ id: record.id, decisionMakerFirstName: record.decision_maker_first_name, decisionMakerLastName: record.decision_maker_last_name, decisionMakerEmail: record.decision_maker_email, decisionMakerPhone: record.decision_maker_phone, company: record.company, companyWebsite: record.company_website, analysis: record.analysis });
+      current.push({ id: record.id, decisionMakerFirstName: record.decision_maker_first_name, decisionMakerLastName: record.decision_maker_last_name, decisionMakerRole: record.decision_maker_role ?? "", decisionMakerEmail: record.decision_maker_email, decisionMakerPhone: record.decision_maker_phone, company: record.company, companyWebsite: record.company_website, analysis: record.analysis });
       prospectRecordsByList.set(record.list_id, current);
     });
     const cloudProspectLists = ((prospectListRows ?? []) as ProspectListRow[]).map((list) => ({ id: list.id, name: list.name, records: prospectRecordsByList.get(list.id) ?? [], deletedAt: list.deleted_at ?? undefined }));
@@ -765,7 +767,7 @@ export default function Home() {
       if (desiredProspectLists.length) {
         await client.from("prospect_lists").upsert(desiredProspectLists.map((list) => ({ id: list.id, workspace_id: workspaceId, name: list.name, deleted_at: "deletedAt" in list ? list.deletedAt : null, updated_at: new Date().toISOString() })));
       }
-      const prospectRecordRows = desiredProspectLists.flatMap((list) => list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
+      const prospectRecordRows = desiredProspectLists.flatMap((list) => list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_role: record.decisionMakerRole, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
       for (const list of desiredProspectLists) {
         const { data: existingRecords } = await client.from("prospect_records").select("id").eq("list_id", list.id);
         const desiredRecordIds = list.records.map((record) => record.id);
@@ -1671,6 +1673,7 @@ function ProspectingMetric({ label, value, detail, accent = false }: { label: st
 const PROSPECT_EXPORT_COLUMNS: Array<{ key: keyof Omit<ProspectRecord, "id">; label: string }> = [
   { key: "decisionMakerFirstName", label: "Nome do decisor" },
   { key: "decisionMakerLastName", label: "Sobrenome do decisor" },
+  { key: "decisionMakerRole", label: "Cargo" },
   { key: "decisionMakerEmail", label: "E-mail do decisor" },
   { key: "decisionMakerPhone", label: "Telefone do decisor" },
   { key: "company", label: "Empresa" },
@@ -1700,10 +1703,12 @@ function exportProspects(activeListName: string, prospects: ProspectRecord[], fo
 
 function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void }) {
   const [trashOpen, setTrashOpen] = useState(false);
+  const [pendingProspectDeleteId, setPendingProspectDeleteId] = useState<string | null>(null);
   const columns: Array<{ key: keyof Omit<ProspectRecord, "id">; label: string; width: string; multiline?: boolean }> = [
     { key: "decisionMakerFirstName", label: "Nome do decisor", width: "min-w-[170px]" },
     { key: "decisionMakerLastName", label: "Sobrenome do decisor", width: "min-w-[190px]" },
-    { key: "decisionMakerEmail", label: "E-mail do decisor", width: "min-w-[230px]" },
+    { key: "decisionMakerRole", label: "Cargo", width: "min-w-[170px]" },
+    { key: "decisionMakerEmail", label: "E-mail do decisor", width: "min-w-[300px]" },
     { key: "decisionMakerPhone", label: "Telefone do decisor", width: "min-w-[180px]" },
     { key: "company", label: "Empresa", width: "min-w-[190px]" },
     { key: "companyWebsite", label: "Site da empresa", width: "min-w-[230px]" },
@@ -1729,12 +1734,18 @@ function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListNam
             <thead><tr className="border-b border-[#DDE5DE] bg-[#F4F7F3]">{columns.map((column) => <th key={column.key} className={`${column.width} px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#75837C]`}>{column.label}</th>)}<th className="w-14 px-3 py-3" aria-label="Ações" /></tr></thead>
             <tbody>{prospects.map((prospect, index) => <tr key={prospect.id} className="group border-b border-[#E8EDE8] align-top transition hover:bg-[#FBFDFB]">
               {columns.map((column) => <td key={column.key} className="px-2 py-2"><label className="sr-only">{column.label} — linha {index + 1}</label>{column.multiline ? <textarea value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} onKeyDown={(event) => { if (event.ctrlKey && event.key === "Enter") { event.preventDefault(); const target = event.currentTarget; const start = target.selectionStart; const end = target.selectionEnd; const nextValue = `${target.value.slice(0, start)}\n\n${target.value.slice(end)}`; onUpdate(prospect.id, column.key, nextValue); requestAnimationFrame(() => target.setSelectionRange(start + 2, start + 2)); } }} placeholder="Escreva sua hipótese, contexto e próximo passo…" className="min-h-[180px] w-full resize-y rounded-lg border border-transparent bg-transparent px-2 py-2 text-sm leading-5 text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" /> : <input value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} placeholder="Preencher" type={column.key === "decisionMakerEmail" ? "email" : "text"} className="h-10 w-full rounded-lg border border-transparent bg-transparent px-2 text-sm text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" />}</td>)}
-              <td className="px-2 py-2"><button type="button" onClick={() => { if (window.confirm("Remover este contato da lista?")) onDelete(prospect.id); }} className="mt-1 grid h-9 w-9 place-items-center rounded-lg text-[#A0AAA4] opacity-60 transition hover:bg-[#FCEDEB] hover:text-[#B94D45] group-hover:opacity-100" aria-label={`Excluir linha ${index + 1}`}><Trash2 size={16} /></button></td>
+              <td className="px-2 py-2"><button type="button" onClick={() => setPendingProspectDeleteId(prospect.id)} className="mt-1 grid h-9 w-9 place-items-center rounded-lg text-[#A0AAA4] opacity-60 transition hover:bg-[#FCEDEB] hover:text-[#B94D45] group-hover:opacity-100" aria-label={`Excluir linha ${index + 1}`}><Trash2 size={16} /></button></td>
             </tr>)}</tbody>
           </table>
           {!prospects.length && <div className="px-6 py-16 text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={23} /></div><p className="mt-4 font-display text-xl font-extrabold tracking-[-0.03em] text-[#27302D]">Sua lista começa aqui</p><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#78857F]">Adicione uma linha para registrar o decisor, a empresa e a leitura comercial que vai orientar sua abordagem.</p><Button onClick={onAdd} className="mt-5 h-10 rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A]"><Plus size={17} />Adicionar primeiro contato</Button></div>}
         </div>
       </section>
+      <Dialog open={Boolean(pendingProspectDeleteId)} onOpenChange={(open) => { if (!open) setPendingProspectDeleteId(null); }}>
+        <DialogContent className="max-w-md rounded-2xl border-[#DDE5DE] bg-[#FCFCFA]">
+          <DialogHeader><DialogTitle className="font-display text-xl font-extrabold text-[#27302D]">Remover contato?</DialogTitle><DialogDescription className="text-sm leading-6 text-[#6F7C74]">O registro será removido da lista ativa e essa ação poderá ser sincronizada com o Supabase.</DialogDescription></DialogHeader>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setPendingProspectDeleteId(null)} className="rounded-xl border-[#DDE5DE]">Cancelar</Button><Button onClick={() => { if (pendingProspectDeleteId) onDelete(pendingProspectDeleteId); setPendingProspectDeleteId(null); }} className="rounded-xl bg-[#B94D45] text-white hover:bg-[#963C35]">Remover</Button></div>
+        </DialogContent>
+      </Dialog>
     </div>
   </div>;
 }

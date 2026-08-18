@@ -203,3 +203,14 @@
 - [x] Consultar com sucesso o status do deploy `6a83a289227c374440986aa2` no Netlify e registrar estado `ready` explícito.
 - [x] Confirmar explicitamente que `https://jocular-profiterole-c5dafc.netlify.app` aponta para o deploy final pós-commit `18aa900`; o retorno do Netlify mostra `state: ready`, `published_at` e `links.alias` canônico.
 - [x] Publicar novamente a partir do checkout confirmado em `18aa900` e registrar a correspondência entre commit, build e deploy canônico; o build foi gerado com `SOURCE_COMMIT=18aa900` e o deploy `6a83a3074df3973413f5694b` ficou `ready` com alias canônico.
+
+## Ajuste da Lista de Prospecção
+
+- [ ] Adicionar o campo `Cargo` depois de `Sobrenome do decisor` na tabela de Empresas.
+- [ ] Ampliar a largura da coluna `E-mail` na visualização da lista.
+- [ ] Preservar edição automática, exportação e sincronização do novo campo.
+- [ ] Validar desktop/mobile, testes e publicação no GitHub e Netlify.
+- [ ] Substituir a confirmação nativa da exclusão de linhas em Empresas por uma confirmação visual não bloqueante e remover o registro temporário de validação.
+
+- [x] Substituir a confirmação nativa `window.confirm` da exclusão de linhas em Empresas por diálogo visual não bloqueante.
+- [x] Validar build, testes e publicação da confirmação visual de exclusão em Empresas.
