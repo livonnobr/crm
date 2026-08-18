@@ -1991,9 +1991,9 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
           <h1 className="page-title !mt-0 text-[26px] sm:text-[30px]">Planos e Metas</h1>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <label className="flex h-9 items-center gap-2 rounded-lg border border-[#DDE8E0] bg-white px-2.5 text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#6E7C74]">
+          <label className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#DDE8E0] bg-white px-2.5 text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#6E7C74]">
             Mês
-            <Input type="month" value={selectedMonth} onChange={(event) => onSelectedMonthChange(event.target.value)} className="h-7 w-[122px] border-0 bg-transparent p-0 text-xs font-bold normal-case tracking-normal text-[#1B2522] shadow-none focus-visible:ring-0" aria-label="Filtrar mês das metas" />
+            <Input type="month" value={selectedMonth} onChange={(event) => onSelectedMonthChange(event.target.value)} className="h-7 w-[168px] min-w-[168px] border-0 bg-transparent p-0 text-xs font-bold normal-case tracking-normal text-[#1B2522] shadow-none focus-visible:ring-0" aria-label="Filtrar mês das metas" />
           </label>
           <button className="tool-button h-9 rounded-lg px-2.5 text-xs" onClick={onOpenPipeline}><Search size={15} /><span className="hidden sm:inline">Ver funil</span></button>
           <Button onClick={onNewGoal} className="h-9 gap-1.5 rounded-lg bg-[#10A97A] px-3 text-xs font-extrabold hover:bg-[#087E5A]"><Plus size={15} />Nova meta</Button>
