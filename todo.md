@@ -338,6 +338,10 @@
 
 - [x] Exibir estado de autenticação e confirmação explícita na aba Empresas quando o lead ainda estiver apenas no armazenamento local
 
-- [ ] Auditar na Vercel oficial por que Empresas e Metas não estão persistindo no Supabase e corrigir o fluxo/configuração
+- [x] Auditar na Vercel oficial por que Empresas e Metas não estão persistindo no Supabase e corrigir o fluxo/configuração; projeto acessível, mas sem sessão/workspace, com aviso de rascunho local publicado
 
 - [x] Redesenhar os ícones da Cadência e deixar apenas o ícone do canal nos cards, sem texto ao lado
+
+- [x] Confirmar se a empresa cadastrada existe no Supabase e se o projeto Vercel crzap-vercel/crm usa as variáveis do mesmo projeto Supabase; Vercel possui VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY em Production/Preview, mas prospect_records está vazio
+
+- [x] Recolocar o botão explícito Salvar no Supabase na aba Empresas, com feedback de autenticação e resultado
