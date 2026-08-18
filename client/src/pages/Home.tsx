@@ -2091,7 +2091,7 @@ function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, acti
     { key: "monthlyVisits", label: "Visitas", width: "w-[105px] min-w-[105px]" },
     { key: "company", label: "Empresa", width: "w-[160px] min-w-[160px]" },
     { key: "companyWebsite", label: "Site", width: "w-[180px] min-w-[180px]" },
-    { key: "analysis", label: "Análise", width: "w-[260px] min-w-[260px]", multiline: true },
+    { key: "analysis", label: "Análise", width: "w-[520px] min-w-[520px]", multiline: true },
   ];
   const companyCount = prospects.filter((prospect) => prospect.company.trim()).length;
 
