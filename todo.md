@@ -261,3 +261,10 @@
 - [x] Sincronizar a versão validada do CRM no GitHub e Vercel, sem usar Netlify.
 - [ ] Criar ou identificar workspace correto no crmsupa e importar as despesas financeiras sem duplicidade (bloqueado: crmsupa ainda não possui workspace/lançamentos).
 - [x] Validar o estado final dos três destinos e documentar eventuais bloqueios de autenticação.
+
+- [ ] Auditar por que funis, listas e demais dados do ambiente anterior não aparecem na Vercel.
+- [ ] Localizar dados recuperáveis em fallback local, Supabase ou snapshot do ambiente anterior.
+- [ ] Migrar os dados recuperados para o crmsupa sem sobrescrever registros existentes e validar na Vercel.
+
+- [x] Separar visualmente cada meta em um quadrado independente lado a lado, removendo o contêiner retangular único.
+- [x] Validar edição, reordenação, responsividade, testes, build e publicação do novo layout.
