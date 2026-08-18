@@ -1623,7 +1623,6 @@ export default function Home() {
           <SidebarGroupLabel className="px-3 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#9AA59F] group-data-[collapsible=icon]:hidden">Visões</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarItem icon={<Activity size={18} />} label="Ritmo do mês" onClick={() => setPage("goals")} />
               <SidebarItem icon={<Settings size={18} />} label="Configurações" onClick={() => toast.info("Configurações do workspace em breve.")} />
             </SidebarMenu>
           </SidebarGroupContent>
