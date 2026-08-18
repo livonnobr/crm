@@ -87,6 +87,7 @@ type ProspectRecord = {
   decisionMakerEmail: string;
   decisionMakerPhone: string;
   decisionMakerSecondaryPhone: string;
+  monthlyVisits: string;
   company: string;
   companyWebsite: string;
   analysis: string;
@@ -213,7 +214,7 @@ type GoalRecord = {
 
 type ConversionSettingsRecord = { workspace_id: string; rates: ConversionRates };
 type ProspectListRow = { id: string; workspace_id: string; name: string; deleted_at: string | null };
-type ProspectRecordRow = { id: string; list_id: string; decision_maker_first_name: string; decision_maker_last_name: string; decision_maker_role: string | null; decision_maker_email: string; decision_maker_phone: string; decision_maker_secondary_phone?: string | null; company: string; company_website: string; analysis: string; position: number };
+type ProspectRecordRow = { id: string; list_id: string; decision_maker_first_name: string; decision_maker_last_name: string; decision_maker_role: string | null; decision_maker_email: string; decision_maker_phone: string; decision_maker_secondary_phone?: string | null; monthly_visits?: string | null; company: string; company_website: string; analysis: string; position: number };
 type FunnelRecord = { id: string; name: string; currency: string; position: number };
 type StageRecord = { id: string; funnel_id: string; name: string; color: string; probability: number; position: number };
 type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null;   notes?: DealNote[] | null; stage_history?: string[] | null };
@@ -386,6 +387,7 @@ const blankProspect: ProspectRecord = {
   decisionMakerEmail: "",
   decisionMakerPhone: "",
   decisionMakerSecondaryPhone: "",
+  monthlyVisits: "",
   company: "",
   companyWebsite: "",
   analysis: "",
@@ -568,7 +570,7 @@ export default function Home() {
       client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
       client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
       client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
-      client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_role, decision_maker_email, decision_maker_phone, decision_maker_secondary_phone, company, company_website, analysis, position").order("position"),
+      client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_role, decision_maker_email, decision_maker_phone, decision_maker_secondary_phone, monthly_visits, company, company_website, analysis, position").order("position"),
       client.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
       client.from("finance_entries").select("id, workspace_id, expense, amount, installment, due_date, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
     ]);
@@ -599,7 +601,7 @@ export default function Home() {
     const prospectRecordsByList = new Map<string, ProspectRecord[]>();
     ((prospectRecordRows ?? []) as ProspectRecordRow[]).forEach((record) => {
       const current = prospectRecordsByList.get(record.list_id) ?? [];
-      current.push({ id: record.id, decisionMakerFirstName: record.decision_maker_first_name, decisionMakerLastName: record.decision_maker_last_name, decisionMakerRole: record.decision_maker_role ?? "", decisionMakerEmail: record.decision_maker_email, decisionMakerPhone: record.decision_maker_phone, decisionMakerSecondaryPhone: record.decision_maker_secondary_phone ?? "", company: record.company, companyWebsite: record.company_website, analysis: record.analysis });
+      current.push({ id: record.id, decisionMakerFirstName: record.decision_maker_first_name, decisionMakerLastName: record.decision_maker_last_name, decisionMakerRole: record.decision_maker_role ?? "", decisionMakerEmail: record.decision_maker_email, decisionMakerPhone: record.decision_maker_phone, decisionMakerSecondaryPhone: record.decision_maker_secondary_phone ?? "", monthlyVisits: record.monthly_visits ?? "", company: record.company, companyWebsite: record.company_website, analysis: record.analysis });
       prospectRecordsByList.set(record.list_id, current);
     });
     const cloudProspectLists = ((prospectListRows ?? []) as ProspectListRow[]).map((list) => ({ id: list.id, name: list.name, records: prospectRecordsByList.get(list.id) ?? [], deletedAt: list.deleted_at ?? undefined }));
@@ -769,7 +771,7 @@ export default function Home() {
       if (desiredProspectLists.length) {
         await client.from("prospect_lists").upsert(desiredProspectLists.map((list) => ({ id: list.id, workspace_id: workspaceId, name: list.name, deleted_at: "deletedAt" in list ? list.deletedAt : null, updated_at: new Date().toISOString() })));
       }
-      const prospectRecordRows = desiredProspectLists.flatMap((list) => list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_role: record.decisionMakerRole, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, decision_maker_secondary_phone: record.decisionMakerSecondaryPhone, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
+      const prospectRecordRows = desiredProspectLists.flatMap((list) => list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_role: record.decisionMakerRole, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, decision_maker_secondary_phone: record.decisionMakerSecondaryPhone, monthly_visits: record.monthlyVisits, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
       for (const list of desiredProspectLists) {
         const { data: existingRecords } = await client.from("prospect_records").select("id").eq("list_id", list.id);
         const desiredRecordIds = list.records.map((record) => record.id);
@@ -1679,6 +1681,7 @@ const PROSPECT_EXPORT_COLUMNS: Array<{ key: keyof Omit<ProspectRecord, "id">; la
   { key: "decisionMakerEmail", label: "E-mail do decisor" },
   { key: "decisionMakerPhone", label: "Telefone principal" },
   { key: "decisionMakerSecondaryPhone", label: "Telefone secundário" },
+  { key: "monthlyVisits", label: "Visitas mensais" },
   { key: "company", label: "Empresa" },
   { key: "companyWebsite", label: "Site da empresa" },
   { key: "analysis", label: "Análise" },
@@ -1718,6 +1721,7 @@ function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListNam
     { key: "decisionMakerEmail", label: "E-mail do decisor", width: "min-w-[300px]" },
     { key: "decisionMakerPhone", label: "Telefone principal", width: "min-w-[190px]" },
     { key: "decisionMakerSecondaryPhone", label: "Telefone secundário", width: "min-w-[190px]" },
+    { key: "monthlyVisits", label: "Visitas mensais", width: "min-w-[170px]" },
     { key: "company", label: "Empresa", width: "min-w-[190px]" },
     { key: "companyWebsite", label: "Site da empresa", width: "min-w-[230px]" },
     { key: "analysis", label: "Análise", width: "min-w-[340px]", multiline: true },

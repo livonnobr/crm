@@ -218,3 +218,6 @@
 - [x] Adicionar telefone secundário à grade, modelo, persistência e exportação de Empresas.
 - [x] Adaptar largura e edição dos campos da grade ao conteúdo digitado sem truncamento visual.
 - [x] Validar testes, build, sincronização GitHub e publicação Netlify da melhoria de Empresas.
+
+- [x] Adicionar o campo Visitas mensais à grade, modelo, persistência Supabase e exportação de Empresas.
+- [x] Validar testes, build, checkpoint e publicação da melhoria Visitas mensais.
