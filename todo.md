@@ -357,3 +357,5 @@
 - [x] Usar as conexões já configuradas para resolver automaticamente o workspace do proprietário na Vercel, sem exigir conexão manual do Supabase
 
 - [x] Corrigir TypeError Invalid URL ao abrir a aba Empresas diretamente por `?aba=prospeccao` na produção Vercel
+
+- [x] Reduzir e reposicionar as informações superiores do card Fechamento do mês para não sobrepor o calendário
