@@ -73,8 +73,8 @@
   .icon-button { @apply grid h-8 w-8 place-items-center rounded-lg text-[#77847E] transition hover:bg-[#EDF2EE] hover:text-[#087E5A] active:scale-[0.95]; }
   .surface-panel { @apply rounded-3xl border border-[#E1E7E1] bg-[#FCFCFA] shadow-[0_14px_36px_rgba(35,54,43,0.035)]; }
   .hero-panel { @apply relative min-h-[232px] rounded-3xl bg-[#17201E] shadow-[0_18px_45px_rgba(22,37,31,0.12)]; }
-  .instrument-strip { @apply grid gap-4 sm:grid-cols-2 xl:grid-cols-4; }
-  .instrument-cell { @apply relative min-w-0 rounded-2xl border border-[#DCE5DE] bg-[#FCFCFA] px-5 py-5 shadow-[0_10px_28px_rgba(35,54,43,0.055)] transition hover:-translate-y-0.5 hover:border-[#C5D9CC] hover:shadow-[0_14px_32px_rgba(35,54,43,0.08)] sm:px-6; }
+  .instrument-strip { @apply grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4; }
+  .instrument-cell { @apply relative h-fit min-w-0 self-start rounded-2xl border border-[#DCE5DE] bg-[#FCFCFA] px-5 py-5 shadow-[0_10px_28px_rgba(35,54,43,0.055)] transition hover:-translate-y-0.5 hover:border-[#C5D9CC] hover:shadow-[0_14px_32px_rgba(35,54,43,0.08)] sm:px-6; }
   .instrument-divider { @apply hidden; }
   .tag-chip { @apply inline-flex items-center rounded-md bg-[#E8F6F0] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#087E5A]; }
   .form-select { @apply flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm font-medium outline-none transition focus:border-[#10A97A] focus:ring-2 focus:ring-[#10A97A]/15; }
