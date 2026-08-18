@@ -233,3 +233,7 @@
 - [x] Adicionar a opção recorrente ao modelo e formulário de Metas.
 - [x] Aplicar metas recorrentes ao período atual sem criar registros duplicados.
 - [x] Validar persistência, cálculos, testes, build e publicação da recorrência.
+
+- [x] Exibir cada meta em um box independente na grade de Metas.
+- [x] Permitir editar e reordenar metas livremente acima, abaixo e lado a lado.
+- [x] Persistir a ordem das metas e validar testes, build e publicação.

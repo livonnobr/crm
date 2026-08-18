@@ -121,6 +121,7 @@ type GoalItem = {
   period: string;
   cadence: GoalCadence;
   recurring: boolean;
+  position: number;
   linkedFunnelId?: string;
   linkedStageId?: string;
   color: "emerald" | "blue" | "amber" | "violet";
@@ -218,6 +219,7 @@ type GoalRecord = {
   linked_funnel_id?: string | null;
   linked_stage_id?: string | null;
   recurring?: boolean | null;
+  position?: number | null;
 };
 
 type ConversionSettingsRecord = { workspace_id: string; rates: ConversionRates };
@@ -243,6 +245,7 @@ const initialGoals: GoalItem[] = [
     period: "Agosto 2026",
     cadence: "Mensal",
     recurring: false,
+    position: 0,
     color: "emerald",
   },
   {
@@ -255,6 +258,7 @@ const initialGoals: GoalItem[] = [
     period: "Agosto 2026",
     cadence: "Mensal",
     recurring: false,
+    position: 1,
     color: "blue",
   },
   {
@@ -267,6 +271,7 @@ const initialGoals: GoalItem[] = [
     period: "Agosto 2026",
     cadence: "Mensal",
     recurring: false,
+    position: 2,
     color: "amber",
   },
 ];
@@ -361,6 +366,7 @@ const blankGoal: GoalItem = {
   period: periodValueForDate("Mensal"),
   cadence: "Mensal",
   recurring: false,
+  position: 0,
   linkedFunnelId: "",
   linkedStageId: "",
   color: "emerald",
@@ -578,7 +584,7 @@ export default function Home() {
     }
 
     const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }, { data: financeRows, error: financeError }] = await Promise.all([
-      client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring").eq("workspace_id", currentWorkspaceId).order("created_at", { ascending: false }),
+      client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, position").eq("workspace_id", currentWorkspaceId).order("position", { ascending: true }),
       client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
       client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
       client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
@@ -634,6 +640,7 @@ export default function Home() {
       period: cleanGoalPeriod(goal.period),
       cadence: parseGoalCadence(goal.period),
       recurring: Boolean(goal.recurring),
+      position: Number(goal.position ?? 0),
       color: goal.color,
       linkedFunnelId: goal.linked_funnel_id ?? "",
       linkedStageId: goal.linked_stage_id ?? "",
@@ -745,7 +752,7 @@ export default function Home() {
     const client = getSupabaseClient();
     const stageToFunnel = new Map(funnels.flatMap((funnel) => funnel.stages.map((stage) => [stage.id, funnel.id] as const)));
     const syncCloudState = async () => {
-      if (goals.length) await client.from("goals").upsert(goals.map((goal) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color, recurring: goal.recurring })));
+      if (goals.length) await client.from("goals").upsert(goals.map((goal, position) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color, recurring: goal.recurring, position })));
       await client.from("conversion_settings").upsert({ workspace_id: workspaceId, rates: conversionRates, updated_at: new Date().toISOString() });
       const funnelIds = funnels.map((funnel) => funnel.id);
       const { data: remoteFunnels } = await client.from("funnels").select("id").eq("workspace_id", workspaceId);
@@ -1018,6 +1025,30 @@ export default function Home() {
     setGoalDialogOpen(true);
   }
 
+  function reorderGoals(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    setGoals((current) => {
+      const fromIndex = current.findIndex((goal) => goal.id === fromId);
+      const toIndex = current.findIndex((goal) => goal.id === toId);
+      if (fromIndex < 0 || toIndex < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next.map((goal, position) => ({ ...goal, position }));
+    });
+  }
+
+  function moveGoal(goalId: string, direction: "up" | "down") {
+    setGoals((current) => {
+      const index = current.findIndex((goal) => goal.id === goalId);
+      const nextIndex = direction === "up" ? index - 1 : index + 1;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next.map((goal, position) => ({ ...goal, position }));
+    });
+  }
+
   function saveGoal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!goalDraft.title.trim() || goalDraft.target <= 0) {
@@ -1028,7 +1059,7 @@ export default function Home() {
       setGoals((current) => current.map((goal) => (goal.id === goalDraft.id ? goalDraft : goal)));
       toast.success("Meta atualizada.");
     } else {
-      setGoals((current) => [{ ...goalDraft, id: uniqueId("goal") }, ...current]);
+      setGoals((current) => [{ ...goalDraft, id: uniqueId("goal"), position: 0 }, ...current.map((goal, index) => ({ ...goal, position: index + 1 }))]);
       toast.success("Meta criada e adicionada ao seu ritmo.");
     }
     setGoalDialogOpen(false);
@@ -1398,6 +1429,8 @@ export default function Home() {
             onOpenPipeline={() => setPage("pipeline")}
             onEditGoal={openEditGoal}
             onDeleteGoal={deleteGoal}
+            onReorderGoals={reorderGoals}
+            onMoveGoal={moveGoal}
             funnels={funnels}
             conversionRates={conversionRates}
             onSaveConversionRates={(rates) => { setConversionRates(rates); toast.success("Taxas de conversão salvas."); }}
@@ -1626,7 +1659,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
   );
 }
 
-function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, funnels, conversionRates, onSaveConversionRates }: { goals: GoalItem[]; achievedRevenue: number; averageGoalProgress: number; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
+function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, onMoveGoal, funnels, conversionRates, onSaveConversionRates }: { goals: GoalItem[]; achievedRevenue: number; averageGoalProgress: number; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; onMoveGoal: (id: string, direction: "up" | "down") => void; funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
   const daysRemaining = daysUntilMonthEnd();
   const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date());
   return (
@@ -1659,8 +1692,8 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
         <section className="mt-7 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="surface-panel p-4 sm:p-6">
             <div className="mb-5 flex items-end justify-between gap-3"><div><p className="eyebrow">Acompanhamento</p><h2 className="section-title">O que move sua receita</h2></div><button onClick={onNewGoal} className="hidden items-center gap-1 text-sm font-bold text-[#087E5A] hover:text-[#056448] sm:flex">Adicionar <ChevronRight size={16} /></button></div>
-            <div className="space-y-3">
-              {goals.map((goal) => <GoalRow key={goal.id} goal={goal} funnels={funnels} onEdit={() => onEditGoal(goal)} onDelete={() => onDeleteGoal(goal.id)} />)}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {goals.map((goal, position) => <GoalRow key={goal.id} goal={goal} funnels={funnels} position={position} total={goals.length} onReorder={onReorderGoals} onMove={(direction) => onMoveGoal(goal.id, direction)} onEdit={() => onEditGoal(goal)} onDelete={() => onDeleteGoal(goal.id)} />)}
               {goals.length === 0 && <div className="grid min-h-48 place-items-center rounded-2xl border border-dashed border-[#D6DED8] bg-[#FAFBF9] p-6 text-center"><Target className="mb-2 h-6 w-6 text-[#10A97A]" /><div><p className="font-bold">Ainda não há metas</p><p className="mt-1 text-sm text-[#718078]">Crie uma meta de prospecção ou vendas para começar.</p></div></div>}
             </div>
           </div>
@@ -1712,10 +1745,10 @@ function GoalSimulator({ funnels, conversionRates, onSaveConversionRates }: { fu
   </section>;
 }
 
-function GoalRow({ goal, funnels, onEdit, onDelete }: { goal: GoalItem; funnels: SalesFunnel[]; onEdit: () => void; onDelete: () => void }) {
+function GoalRow({ goal, funnels, onEdit, onDelete, position, total, onReorder, onMove }: { goal: GoalItem; funnels: SalesFunnel[]; onEdit: () => void; onDelete: () => void; position: number; total: number; onReorder: (fromId: string, toId: string) => void; onMove: (direction: "up" | "down") => void }) {
   const progress = progressOf(goal);
   const styles = { emerald: "bg-[#10A97A]", blue: "bg-[#4386B6]", amber: "bg-[#D8952E]", violet: "bg-[#9075B5]" };
-  return <div className="group grid gap-4 rounded-2xl border border-[#E7EBE6] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8D0] hover:shadow-[0_12px_28px_rgba(30,55,44,0.05)] sm:grid-cols-[auto_minmax(190px,1fr)_minmax(175px,0.6fr)_auto] sm:items-center"><div className="goal-meter" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div><div className="mb-1 flex flex-wrap items-center gap-2"><span className="tag-chip">{goal.type}</span><span className="rounded-full bg-[#F0F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#63736B]">{goal.cadence}</span>{goal.recurring && <span className="rounded-full bg-[#E7F5EF] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#087E5A]">Recorrente</span>}<span className="text-xs text-[#88938E]">{goal.recurring ? periodValueForDate(goal.cadence) : cleanGoalPeriod(goal.period)}</span></div><h3 className="font-display text-base font-bold tracking-[-0.025em] text-[#27302D]">{goal.title}</h3>{goal.linkedStageId && <p className="mt-1 text-[11px] font-semibold text-[#087E5A]">Automática · {funnels.flatMap((funnel) => funnel.stages.map((stage) => funnel.name + " · " + stage.name)).find((label) => label.endsWith(" · " + funnels.flatMap((funnel) => funnel.stages).find((stage) => stage.id === goal.linkedStageId)?.name)) ?? "Etapa do funil"}</p>}</div><div><div className="mb-2 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#35403B]">{formatGoalValue(goal.actual, goal.unit)}</span><span className="text-xs font-medium text-[#7D8983]">de {formatGoalValue(goal.target, goal.unit)}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className={`h-full rounded-full ${styles[goal.color]}`} style={{ width: `${progress}%` }} /></div></div><div className="flex justify-end gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100"><button onClick={onEdit} className="icon-button" aria-label={`Editar ${goal.title}`}><Pencil size={15} /></button><button onClick={onDelete} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${goal.title}`}><Trash2 size={15} /></button></div></div>;
+  return <div draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", goal.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const fromId = event.dataTransfer.getData("text/plain"); if (fromId) onReorder(fromId, goal.id); }} className="group relative grid gap-4 rounded-2xl border border-[#E7EBE6] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8D0] hover:shadow-[0_12px_28px_rgba(30,55,44,0.05)] sm:grid-cols-[auto_minmax(190px,1fr)_minmax(175px,0.6fr)_auto] sm:items-center"><div className="goal-meter" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div><div className="mb-1 flex flex-wrap items-center gap-2"><span className="tag-chip">{goal.type}</span><span className="rounded-full bg-[#F0F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#63736B]">{goal.cadence}</span>{goal.recurring && <span className="rounded-full bg-[#E7F5EF] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#087E5A]">Recorrente</span>}<span className="text-xs text-[#88938E]">{goal.recurring ? periodValueForDate(goal.cadence) : cleanGoalPeriod(goal.period)}</span></div><h3 className="font-display text-base font-bold tracking-[-0.025em] text-[#27302D]">{goal.title}</h3>{goal.linkedStageId && <p className="mt-1 text-[11px] font-semibold text-[#087E5A]">Automática · {funnels.flatMap((funnel) => funnel.stages.map((stage) => funnel.name + " · " + stage.name)).find((label) => label.endsWith(" · " + funnels.flatMap((funnel) => funnel.stages).find((stage) => stage.id === goal.linkedStageId)?.name)) ?? "Etapa do funil"}</p>}</div><div><div className="mb-2 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#35403B]">{formatGoalValue(goal.actual, goal.unit)}</span><span className="text-xs font-medium text-[#7D8983]">de {formatGoalValue(goal.target, goal.unit)}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className={`h-full rounded-full ${styles[goal.color]}`} style={{ width: `${progress}%` }} /></div></div><div className="flex items-center justify-end gap-1"><span className="mr-auto cursor-grab text-xs font-bold uppercase tracking-[0.1em] text-[#A0ACA5]" title="Arraste para reorganizar">Mover</span><button onClick={() => onMove("up")} disabled={position === 0} className="icon-button disabled:cursor-not-allowed disabled:opacity-30" aria-label="Mover meta para cima">↑</button><button onClick={() => onMove("down")} disabled={position === total - 1} className="icon-button disabled:cursor-not-allowed disabled:opacity-30" aria-label="Mover meta para baixo">↓</button><button onClick={onEdit} className="icon-button" aria-label={`Editar ${goal.title}`}><Pencil size={15} /></button><button onClick={onDelete} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${goal.title}`}><Trash2 size={15} /></button></div></div>;
 }
 
 function ProspectingMetric({ label, value, detail, accent = false }: { label: string; value: string; detail: string; accent?: boolean }) {
