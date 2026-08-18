@@ -246,3 +246,7 @@
 
 - [x] Adicionar ícones grandes e expressivos aos blocos da Cadência conforme canal e ação.
 - [x] Validar responsividade, testes, build e publicação do refinamento visual da Cadência.
+
+- [x] Abrir pop-up de criação ao clicar em célula vazia da Cadência, sem criar ação diretamente.
+- [x] Adicionar os canais LinkedIn e Instagram com ícones e persistência compatível.
+- [x] Remover o botão verde Nova ação e validar interação, testes, build e publicação.

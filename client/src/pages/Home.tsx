@@ -29,6 +29,8 @@ import {
   MessageCircle,
   PhoneCall,
   ClipboardCheck,
+  Linkedin,
+  Instagram,
   Menu,
   MoreHorizontal,
   Pencil,
@@ -153,7 +155,7 @@ type DealActivity = {
 };
 
 type CadenceSlot = "morning" | "afternoon";
-type CadenceChannel = "E-mail" | "WhatsApp" | "Ligação" | "Tarefa";
+type CadenceChannel = "E-mail" | "WhatsApp" | "Ligação" | "Tarefa" | "LinkedIn" | "Instagram";
 type CadenceBlock = {
   id: string;
   day: number;
@@ -862,9 +864,9 @@ export default function Home() {
     setFinanceEntries((current) => current.filter((entry) => entry.id !== id));
     toast.success("Lançamento removido.");
   }
-  function addCadenceBlock(day: number, slot: CadenceSlot) {
+  function addCadenceBlock(day: number, slot: CadenceSlot, details?: Pick<CadenceBlock, "title" | "channel" | "notes">) {
     if (cadenceBlocks.some((block) => block.day === day && block.slot === slot)) { toast.info("Essa célula já tem uma ação."); return; }
-    const nextBlock: CadenceBlock = { id: uniqueId("cadence"), day, slot, title: "Nova ação", channel: "Tarefa", notes: "Defina o próximo passo comercial." };
+    const nextBlock: CadenceBlock = { id: uniqueId("cadence"), day, slot, title: details?.title ?? "Nova ação", channel: details?.channel ?? "Tarefa", notes: details?.notes ?? "Defina o próximo passo comercial." };
     setCadenceBlocks((current) => [...current, nextBlock]);
     toast.success("Ação adicionada à cadência.");
   }
@@ -1868,23 +1870,25 @@ function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, acti
   </div>;
 }
 
-function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks: CadenceBlock[]; onAdd: (day: number, slot: CadenceSlot) => void; onMove: (id: string, day: number, slot: CadenceSlot) => void; onEdit: (block: CadenceBlock) => void; onDelete: (id: string) => void }) {
+function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks: CadenceBlock[]; onAdd: (day: number, slot: CadenceSlot, details?: Pick<CadenceBlock, "title" | "channel" | "notes">) => void; onMove: (id: string, day: number, slot: CadenceSlot) => void; onEdit: (block: CadenceBlock) => void; onDelete: (id: string) => void }) {
   const [draft, setDraft] = useState<CadenceBlock | null>(null);
+  const [createSlot, setCreateSlot] = useState<{ day: number; slot: CadenceSlot } | null>(null);
   const weekdays = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo", "segunda", "terça", "quarta"];
-  const channels: CadenceChannel[] = ["E-mail", "WhatsApp", "Ligação", "Tarefa"];
-  const channelTone: Record<CadenceChannel, string> = { "E-mail": "bg-[#E8F0FF] text-[#355E9A]", WhatsApp: "bg-[#E8F6F0] text-[#087E5A]", Ligação: "bg-[#FFF2DD] text-[#99631A]", Tarefa: "bg-[#EEEAE3] text-[#4E5752]" };
-  const channelIcon: Record<CadenceChannel, typeof Mail> = { "E-mail": Mail, WhatsApp: MessageCircle, Ligação: PhoneCall, Tarefa: ClipboardCheck };
-  const channelIconTone: Record<CadenceChannel, string> = { "E-mail": "bg-[#DCE9FF] text-[#355E9A]", WhatsApp: "bg-[#D5F2E4] text-[#087E5A]", Ligação: "bg-[#FFE8BD] text-[#99631A]", Tarefa: "bg-[#E4DED3] text-[#4E5752]" };
+  const channels: CadenceChannel[] = ["E-mail", "WhatsApp", "Ligação", "Tarefa", "LinkedIn", "Instagram"];
+  const channelTone: Record<CadenceChannel, string> = { "E-mail": "bg-[#E8F0FF] text-[#355E9A]", WhatsApp: "bg-[#E8F6F0] text-[#087E5A]", Ligação: "bg-[#FFF2DD] text-[#99631A]", Tarefa: "bg-[#EEEAE3] text-[#4E5752]", LinkedIn: "bg-[#E1EEFF] text-[#155A9C]", Instagram: "bg-[#FBE7F0] text-[#A33D6C]" };
+  const channelIcon: Record<CadenceChannel, typeof Mail> = { "E-mail": Mail, WhatsApp: MessageCircle, Ligação: PhoneCall, Tarefa: ClipboardCheck, LinkedIn: Linkedin, Instagram };
+  const channelIconTone: Record<CadenceChannel, string> = { "E-mail": "bg-[#DCE9FF] text-[#355E9A]", WhatsApp: "bg-[#D5F2E4] text-[#087E5A]", Ligação: "bg-[#FFE8BD] text-[#99631A]", Tarefa: "bg-[#E4DED3] text-[#4E5752]", LinkedIn: "bg-[#D6E8FF] text-[#155A9C]", Instagram: "bg-[#F8D8E6] text-[#A33D6C]" };
   const slotLabel: Record<CadenceSlot, string> = { morning: "Manhã", afternoon: "Tarde" };
   const blockAt = (day: number, slot: CadenceSlot) => blocks.find((block) => block.day === day && block.slot === slot);
   const beginEdit = (block: CadenceBlock) => setDraft({ ...block });
-  const saveDraft = () => { if (draft?.title.trim()) { onEdit(draft); setDraft(null); } };
+  const openCreate = (day: number, slot: CadenceSlot) => { setCreateSlot({ day, slot }); setDraft({ id: "", day, slot, title: "", channel: "E-mail", notes: "" }); };
+  const saveDraft = () => { if (draft?.title.trim()) { if (createSlot) { onAdd(createSlot.day, createSlot.slot, { title: draft.title, channel: draft.channel, notes: draft.notes }); } else { onEdit(draft); } setDraft(null); setCreateSlot(null); } };
 
   return <div className="min-h-screen bg-[#F6F5F1] px-4 pb-10 pt-[84px] md:px-8 md:pt-8">
     <div className="mx-auto max-w-[1500px]">
       <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div><p className="eyebrow">Operação comercial</p><h1 className="font-display text-3xl font-extrabold tracking-[-0.06em] text-[#1B2522]">Cadência de prospecção</h1><p className="mt-1 max-w-xl text-sm font-medium text-[#77827C]">Desenhe a sequência de contatos por dia e turno. Arraste os blocos para reorganizar o ritmo.</p></div>
-        <div className="flex items-center gap-2"><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-bold text-[#087E5A]">{blocks.length} {blocks.length === 1 ? "ação" : "ações"} planejadas</span><Button onClick={() => onAdd(1, "morning")} className="h-9 rounded-xl bg-[#10A97A] px-3 text-xs font-extrabold hover:bg-[#087E5A]"><Plus size={15} /> Nova ação</Button></div>
+        <div className="flex items-center gap-2"><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-bold text-[#087E5A]">{blocks.length} {blocks.length === 1 ? "ação" : "ações"} planejadas</span></div>
       </div>
       <div className="overflow-hidden rounded-[24px] border border-[#E0E5DF] bg-[#FBFBF9] shadow-[0_18px_50px_rgba(27,37,34,0.06)]">
         <div className="overflow-x-auto">
@@ -1893,13 +1897,13 @@ function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks:
               <div className="flex items-center px-4 py-4 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#B9D7CA]">Turno</div>
               {weekdays.map((weekday, index) => <div key={index} className="border-l border-white/10 px-3 py-3 text-center"><div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#B9D7CA]">Dia {String(index + 1).padStart(2, "0")}</div><div className="mt-1 text-xs font-bold capitalize">{weekday}</div></div>)}
             </div>
-            {(["morning", "afternoon"] as CadenceSlot[]).map((slot) => <div key={slot} className="grid grid-cols-[112px_repeat(10,minmax(100px,1fr))] border-b border-[#E3E6E0] last:border-b-0"><div className="flex items-center bg-[#EFF4EF] px-4 text-xs font-extrabold uppercase tracking-[0.08em] text-[#315C4D]">{slotLabel[slot]}</div>{Array.from({ length: 10 }, (_, index) => { const day = index + 1; const block = blockAt(day, slot); return <div key={day} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { if (block) return; const id = event.dataTransfer?.getData("text/plain"); if (id) onMove(id, day, slot); }} className="min-h-[172px] border-l border-[#E3E6E0] bg-[#FCFCFA] p-2 transition-colors hover:bg-[#F3F8F4]">{block ? <div draggable onDragStart={(event) => { event.dataTransfer.setData("text/plain", block.id); }} onDoubleClick={() => beginEdit(block)} className="group relative flex h-full min-h-[150px] cursor-grab flex-col rounded-2xl border border-[#CFE6DA] bg-[#E8F6F0] p-3 shadow-[0_8px_18px_rgba(16,169,122,0.08)] active:cursor-grabbing"><div className="mb-2 flex items-start justify-between gap-2"><div className={`grid h-14 w-14 place-items-center rounded-2xl shadow-inner ${channelIconTone[block.channel]}`}>{(() => { const Icon = channelIcon[block.channel]; return <Icon size={30} strokeWidth={2.1} aria-label={block.channel} />; })()}</div><div className="flex items-center gap-1.5"><span className={`rounded-full px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.08em] ${channelTone[block.channel]}`}>{block.channel}</span><GripVertical size={15} className="text-[#86A99B]" /></div></div><p className="text-sm font-extrabold leading-tight text-[#1B2522]">{block.title}</p><p className="mt-2 line-clamp-3 text-[11px] font-medium leading-4 text-[#577066]">{block.notes || "Sem observações"}</p><div className="mt-auto flex items-center justify-between pt-3 text-[10px] font-bold text-[#087E5A]"><button onClick={(event) => { event.stopPropagation(); beginEdit(block); }} className="opacity-0 transition-opacity group-hover:opacity-100">Editar</button><button onClick={(event) => { event.stopPropagation(); onDelete(block.id); }} className="text-[#B04A43] opacity-0 transition-opacity group-hover:opacity-100">Excluir</button></div></div> : <button onClick={() => onAdd(day, slot)} className="flex h-full min-h-[150px] w-full flex-col items-center justify-center rounded-2xl border border-dashed border-[#D7DFD8] text-[#A0AAA4] transition hover:border-[#10A97A] hover:bg-[#F3F8F4] hover:text-[#087E5A]"><Plus size={18} /><span className="mt-2 text-[10px] font-bold">Adicionar ação</span></button>}</div>; })}</div>)}
+            {(["morning", "afternoon"] as CadenceSlot[]).map((slot) => <div key={slot} className="grid grid-cols-[112px_repeat(10,minmax(100px,1fr))] border-b border-[#E3E6E0] last:border-b-0"><div className="flex items-center bg-[#EFF4EF] px-4 text-xs font-extrabold uppercase tracking-[0.08em] text-[#315C4D]">{slotLabel[slot]}</div>{Array.from({ length: 10 }, (_, index) => { const day = index + 1; const block = blockAt(day, slot); return <div key={day} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { if (block) return; const id = event.dataTransfer?.getData("text/plain"); if (id) onMove(id, day, slot); }} className="min-h-[172px] border-l border-[#E3E6E0] bg-[#FCFCFA] p-2 transition-colors hover:bg-[#F3F8F4]">{block ? <div draggable onDragStart={(event) => { event.dataTransfer.setData("text/plain", block.id); }} onDoubleClick={() => beginEdit(block)} className="group relative flex h-full min-h-[150px] cursor-grab flex-col rounded-2xl border border-[#CFE6DA] bg-[#E8F6F0] p-3 shadow-[0_8px_18px_rgba(16,169,122,0.08)] active:cursor-grabbing"><div className="mb-2 flex items-start justify-between gap-2"><div className={`grid h-14 w-14 place-items-center rounded-2xl shadow-inner ${channelIconTone[block.channel]}`}>{(() => { const Icon = channelIcon[block.channel]; return <Icon size={30} strokeWidth={2.1} aria-label={block.channel} />; })()}</div><div className="flex items-center gap-1.5"><span className={`rounded-full px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.08em] ${channelTone[block.channel]}`}>{block.channel}</span><GripVertical size={15} className="text-[#86A99B]" /></div></div><p className="text-sm font-extrabold leading-tight text-[#1B2522]">{block.title}</p><p className="mt-2 line-clamp-3 text-[11px] font-medium leading-4 text-[#577066]">{block.notes || "Sem observações"}</p><div className="mt-auto flex items-center justify-between pt-3 text-[10px] font-bold text-[#087E5A]"><button onClick={(event) => { event.stopPropagation(); beginEdit(block); }} className="opacity-0 transition-opacity group-hover:opacity-100">Editar</button><button onClick={(event) => { event.stopPropagation(); onDelete(block.id); }} className="text-[#B04A43] opacity-0 transition-opacity group-hover:opacity-100">Excluir</button></div></div> : <button onClick={() => openCreate(day, slot)} className="flex h-full min-h-[150px] w-full flex-col items-center justify-center rounded-2xl border border-dashed border-[#D7DFD8] text-[#A0AAA4] transition hover:border-[#10A97A] hover:bg-[#F3F8F4] hover:text-[#087E5A]"><Plus size={18} /><span className="mt-2 text-[10px] font-bold">Adicionar ação</span></button>}</div>; })}</div>)}
           </div>
         </div>
       </div>
       <p className="mt-3 text-xs font-medium text-[#87928D]">Dica: arraste um bloco para uma célula vazia. Dê duplo clique ou use “Editar” para alterar canal, título e observações.</p>
     </div>
-    <Dialog open={Boolean(draft)} onOpenChange={(open) => !open && setDraft(null)}><DialogContent className="max-w-[480px] border-[#E2E7E0] bg-[#FCFCFA]"><DialogHeader><DialogTitle className="font-display text-2xl tracking-[-0.04em]">Editar ação da cadência</DialogTitle><DialogDescription>Defina a mensagem e o canal desse ponto da sequência.</DialogDescription></DialogHeader>{draft && <div className="space-y-4"><div><Label>Título</Label><Input className="mt-1" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div><div><Label>Canal</Label><select className="form-select mt-1" value={draft.channel} onChange={(event) => setDraft({ ...draft, channel: event.target.value as CadenceChannel })}>{channels.map((channel) => <option key={channel}>{channel}</option>)}</select></div><div><Label>Observações</Label><textarea className="form-textarea mt-1 min-h-[110px]" value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setDraft(null)}>Cancelar</Button><Button onClick={saveDraft} className="bg-[#10A97A] hover:bg-[#087E5A]">Salvar ação</Button></div></div>}</DialogContent></Dialog>
+    <Dialog open={Boolean(draft)} onOpenChange={(open) => { if (!open) { setDraft(null); setCreateSlot(null); } }}><DialogContent className="max-w-[480px] border-[#E2E7E0] bg-[#FCFCFA]"><DialogHeader><DialogTitle className="font-display text-2xl tracking-[-0.04em]">{createSlot ? "Nova ação da cadência" : "Editar ação da cadência"}</DialogTitle><DialogDescription>Defina a mensagem e o canal desse ponto da sequência.</DialogDescription></DialogHeader>{draft && <div className="space-y-4"><div><Label>Título</Label><Input className="mt-1" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div><div><Label>Canal</Label><select className="form-select mt-1" value={draft.channel} onChange={(event) => setDraft({ ...draft, channel: event.target.value as CadenceChannel })}>{channels.map((channel) => <option key={channel}>{channel}</option>)}</select></div><div><Label>Observações</Label><textarea className="form-textarea mt-1 min-h-[110px]" value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setDraft(null)}>Cancelar</Button><Button onClick={saveDraft} className="bg-[#10A97A] hover:bg-[#087E5A]">Salvar ação</Button></div></div>}</DialogContent></Dialog>
   </div>;
 }
 
