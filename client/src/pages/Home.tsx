@@ -1759,14 +1759,14 @@ export default function Home() {
       </main>
 
       <Dialog open={goalDialogOpen} onOpenChange={setGoalDialogOpen}>
-        <DialogContent className="max-w-[520px] border-[#E2E7E0] bg-[#FCFCFA] p-0">
+        <DialogContent className="grid-rows-[auto_minmax(0,1fr)] max-h-[calc(100vh-2rem)] max-w-[520px] overflow-hidden border-[#E2E7E0] bg-[#FCFCFA] p-0">
           <div className="border-b border-[#E8ECE6] px-6 py-5">
             <DialogHeader>
               <DialogTitle className="font-display text-2xl tracking-[-0.04em]">{goalDraft.id ? "Editar meta" : "Criar nova meta"}</DialogTitle>
               <DialogDescription>Defina o resultado que orientará a sua cadência no período.</DialogDescription>
             </DialogHeader>
           </div>
-          <form onSubmit={saveGoal} className="space-y-5 px-6 py-6">
+          <form onSubmit={saveGoal} className="min-h-0 space-y-5 overflow-y-auto overscroll-contain px-6 py-6">
             <FormField label="Nome da meta"><Input value={goalDraft.title} onChange={(event) => setGoalDraft({ ...goalDraft, title: event.target.value })} placeholder="Ex.: Propostas enviadas" /></FormField>
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Tipo">
@@ -1789,7 +1789,7 @@ export default function Home() {
             <label className="flex items-center gap-3 rounded-xl border border-[#DDE8E1] bg-[#F5FAF7] px-3 py-3 text-sm font-semibold text-[#35403B]"><input type="checkbox" checked={goalDraft.recurring} onChange={(event) => { const recurring = event.target.checked; setGoalDraft({ ...goalDraft, recurring }); if (!recurring) setGoalOverrideMonth(null); }} className="h-4 w-4 accent-[#10A97A]" />Meta recorrente<span className="ml-auto text-xs font-medium text-[#7D8983]">Repete sem duplicar</span></label>
             {goalDraft.id && goalDraft.recurring && <label className="flex items-center gap-3 rounded-xl border border-[#DDE8E1] bg-[#FFF9E8] px-3 py-3 text-sm font-semibold text-[#35403B]"><input type="checkbox" checked={goalOverrideMonth === selectedGoalMonth} onChange={(event) => { if (event.target.checked) { const effective = goalValuesForMonth(goalDraft, selectedGoalMonth); setGoalDraft({ ...goalDraft, target: effective.target, actual: effective.actual }); setGoalOverrideMonth(selectedGoalMonth); } else { const baseGoal = goals.find((goal) => goal.id === goalDraft.id); if (baseGoal) setGoalDraft(baseGoal); setGoalOverrideMonth(null); } }} className="h-4 w-4 accent-[#C88920]" />Personalizar apenas {selectedGoalMonth}<span className="ml-auto text-xs font-medium text-[#8A6D2A]">Não altera a recorrência</span></label>}
             <FormField label="Atualização automática pelo funil"><select className="form-select" value={goalDraft.linkedStageId ?? ""} onChange={(event) => { const stageId = event.target.value; const funnel = funnels.find((item) => item.stages.some((stage) => stage.id === stageId)); setGoalDraft({ ...goalDraft, linkedStageId: stageId, linkedFunnelId: funnel?.id ?? "" }); }}><option value="">Sem vínculo automático</option>{funnels.flatMap((funnel) => funnel.stages.map((stage) => <option key={`${funnel.id}-${stage.id}`} value={stage.id}>{funnel.name} · {stage.name}</option>))}</select><p className="mt-1 text-xs text-[#7D8983]">Cada oportunidade conta uma vez quando entra na etapa escolhida.</p></FormField>
-            <div className="flex items-center justify-between border-t border-[#E8ECE6] pt-5">
+            <div className="sticky bottom-0 z-10 -mx-6 flex items-center justify-between border-t border-[#E8ECE6] bg-[#FCFCFA]/95 px-6 pb-1 pt-5 backdrop-blur">
               {goalDraft.id ? <button type="button" onClick={() => deleteGoal(goalDraft.id)} className="inline-flex items-center gap-2 text-sm font-bold text-[#B04A43]"><Trash2 size={16} />Excluir</button> : <span />}
               <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setGoalDialogOpen(false)}>Cancelar</Button><Button type="submit" className="bg-[#10A97A] hover:bg-[#087E5A]">Salvar meta</Button></div>
             </div>
