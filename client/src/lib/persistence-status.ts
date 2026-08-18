@@ -7,7 +7,7 @@ export function persistenceStatus(isConfirmed: boolean): PersistenceStatus {
 export function persistenceLabel(isConfirmed: boolean): string {
   return persistenceStatus(isConfirmed) === "cloud"
     ? "Sincronizado automaticamente"
-    : "Sincronização pendente";
+    : "Edição local";
 }
 
 export function persistenceActionLabel(_isConfirmed: boolean): string {
