@@ -237,3 +237,6 @@
 - [x] Exibir cada meta em um box independente na grade de Metas.
 - [x] Permitir editar e reordenar metas livremente acima, abaixo e lado a lado.
 - [x] Persistir a ordem das metas e validar testes, build e publicação.
+
+- [x] Corrigir o simulador para aplicar cada taxa sobre a etapa imediatamente anterior.
+- [x] Atualizar textos e validar projeções, testes, build e publicação da correção.
