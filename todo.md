@@ -291,3 +291,5 @@
 - [x] Levar círculo e barra de evolução para os cards superiores de metas
 - [x] Remover edição, exclusão e setas dos cards inferiores, mantendo essas ações somente no topo
 - [x] Manter a reorganização das metas exclusivamente por arrastar e soltar
+- [x] Destacar o card Fechamento do mês com uma cor própria
+- [x] Calcular o fechamento do mês em dias úteis, excluindo sábados, domingos e feriados

@@ -64,6 +64,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupConte
 import { getSupabaseClient, isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { summarizeFinanceEntries } from "@/lib/finance";
 import { cleanGoalPeriod, goalPeriodInputType, goalPeriodInputValue, goalPeriodValue as goalPeriodValueFromHelper, periodValueForDate } from "@/lib/goal-period";
+import { businessDaysUntilMonthEnd } from "@/lib/business-days";
 
 type Page = "goals" | "pipeline" | "activities" | "people" | "prospecting" | "cadence" | "finance";
 
@@ -467,8 +468,7 @@ function goalPeriodValue(goal: GoalItem) {
 }
 
 function daysUntilMonthEnd(date = new Date()) {
-  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  return Math.max(0, lastDay.getDate() - date.getDate());
+  return businessDaysUntilMonthEnd(date);
 }
 
 function progressOf(goal: GoalItem) {
@@ -1685,7 +1685,7 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
             return <div key={goal.id} className="instrument-cell"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="pulse-dot" /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#6F7D76]">{goal.type}</span></div><div className="flex items-center gap-1"><span className="text-xs font-extrabold text-[#087E5A]">{progress}%</span><button type="button" onClick={() => onEditGoal(goal)} className="icon-button h-7 w-7 opacity-70 transition hover:opacity-100" aria-label={`Editar ${goal.title}`}><Pencil size={13} /></button><button type="button" onClick={() => onDeleteGoal(goal.id)} className="icon-button h-7 w-7 text-[#B04D45] opacity-70 transition hover:opacity-100" aria-label={`Excluir ${goal.title}`}><Trash2 size={13} /></button></div></div><div className="mt-3 flex items-center gap-3"><div className="goal-meter shrink-0" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[#6C7A73]">{goal.title}</p><p className="mt-0.5 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#1B2522]">{formatGoalValue(goal.actual, goal.unit)}<span className="ml-1 text-sm font-bold text-[#85918B]">/ {formatGoalValue(goal.target, goal.unit)}</span></p></div></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className="h-full rounded-full bg-[#10A97A] transition-[width]" style={{ width: `${progress}%` }} /></div><p className="mt-2 text-[11px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, goal.unit)}</p>{index < goals.length - 1 && <span className="instrument-divider" />}</div>;
           })}
           {goals.length === 0 && <button onClick={onNewGoal} className="flex items-center gap-2 text-sm font-bold text-[#087E5A]"><CirclePlus size={18} />Criar primeiro instrumento</button>}
-          <div className="instrument-cell"><div className="flex items-center gap-2"><span className="pulse-dot bg-[#D8952E]" /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#6F7D76]">Fechamento do mês</span></div><p className="mt-3 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#1B2522]">{daysRemaining} {daysRemaining === 1 ? "dia" : "dias"}</p><p className="mt-1 text-[11px] font-medium capitalize text-[#85918B]">restantes em {currentMonth}</p></div>
+          <div className="instrument-cell border-[#E5BE6B] bg-[#FFF4D9] shadow-[0_10px_24px_rgba(196,141,35,0.12)]"><div className="flex items-center gap-2"><span className="pulse-dot bg-[#C88920]" /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8A651D]">Fechamento do mês</span></div><p className="mt-3 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#6B4D12]">{daysRemaining} {daysRemaining === 1 ? "dia útil" : "dias úteis"}</p><p className="mt-1 text-[11px] font-medium capitalize text-[#8A6D2A]">restantes em {currentMonth} · sábados, domingos e feriados não entram</p></div>
         </section>
         <GoalSimulator funnels={funnels} conversionRates={conversionRates} onSaveConversionRates={onSaveConversionRates} />
         <section className="hero-panel mt-5 overflow-hidden">
