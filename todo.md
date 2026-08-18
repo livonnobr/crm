@@ -275,3 +275,6 @@
 - [x] Verificar se a correção do simulador está na branch GitHub `ritmo-crm`.
 - [x] Enviar o commit validado ao GitHub caso esteja ausente.
 - [x] Confirmar ou disparar o deploy correspondente na Vercel `/crm`.
+
+- [x] Separar os indicadores superiores de Metas em cards independentes, removendo o blocão único.
+- [x] Validar responsividade, testes, build, GitHub e Vercel após o ajuste visual.
