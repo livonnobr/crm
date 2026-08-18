@@ -290,7 +290,22 @@ export async function syncWorkspaceSnapshot(workspaceId: string, state: any) {
   if (funnelRows.length) { const { error } = await supabase.from("funnels").upsert(funnelRows); if (error) throw error; }
   const stageRows = funnels.flatMap((funnel: any) => (funnel.stages ?? []).map((stage: any, position: number) => ({ id: mapStageReference(stage.id), funnel_id: mapFunnelReference(funnel.id), name: stage.name, color: stage.color, probability: stage.probability, position })));
   if (funnelIds.length) { const { data: existingStages, error } = await supabase.from("stages").select("id").in("funnel_id", funnelIds); if (error) throw error; const keep = stageRows.map((row: any) => row.id); const stale = (existingStages ?? []).map((row: any) => row.id).filter((id: string) => !keep.includes(id)); if (stale.length) { const result = await supabase.from("stages").delete().in("id", stale); if (result.error) throw result.error; } }
-  if (stageRows.length) { const { error } = await supabase.from("stages").upsert(stageRows); if (error) throw error; }
+  if (stageRows.length) {
+    // `stages` enforces unique (funnel_id, position). A direct upsert can fail
+    // when two stages swap positions because PostgreSQL checks each row while
+    // the other row still owns the destination position. Move every stage to a
+    // temporary, collision-free range first, then write the requested order.
+    const updatedAt = new Date().toISOString();
+    const temporaryStageRows = stageRows.map((row: any, index: number) => ({
+      ...row,
+      position: 1_000_000 + index,
+      updated_at: updatedAt,
+    }));
+    const temporaryResult = await supabase.from("stages").upsert(temporaryStageRows);
+    if (temporaryResult.error) throw temporaryResult.error;
+    const finalResult = await supabase.from("stages").upsert(stageRows.map((row: any) => ({ ...row, updated_at: updatedAt })));
+    if (finalResult.error) throw finalResult.error;
+  }
   const opportunityRows = deals.flatMap((deal: any, position: number) => { const stageId = mapStageReference(deal.stageId); const funnelId = stageToFunnel.get(stageId); return funnelId ? [{ id: entityUuid(deal.id, "opportunity"), funnel_id: funnelId, stage_id: stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? "", contact_role: deal.contactRole ?? "", contact_email: deal.contactEmail ?? "", contact_phone: deal.contactPhone ?? "", company_data: { ...(deal.companyData ?? {}), __ritmoStageHistory: (deal.stageHistory ?? [deal.stageId]).map((value: unknown) => mapStageReference(value)), __ritmoStageEvents: (deal.companyData?.__ritmoStageEvents ?? deal.stageEvents ?? []).map((event: any) => ({ ...event, stageId: mapStageReference(event.stageId) })) }, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : []; });
   if (funnelIds.length) { const { data: existingDeals, error } = await supabase.from("opportunities").select("id").in("funnel_id", funnelIds); if (error) throw error; const keep = opportunityRows.map((row: any) => row.id); const stale = (existingDeals ?? []).map((row: any) => row.id).filter((id: string) => !keep.includes(id)); if (stale.length) { const result = await supabase.from("opportunities").delete().in("id", stale); if (result.error) throw result.error; } }
   if (opportunityRows.length) { const { error } = await supabase.from("opportunities").upsert(opportunityRows); if (error) throw error; }

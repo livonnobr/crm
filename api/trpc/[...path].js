@@ -415,8 +415,16 @@ async function syncWorkspaceSnapshot(workspaceId, state) {
     }
   }
   if (stageRows.length) {
-    const { error } = await supabase.from("stages").upsert(stageRows);
-    if (error) throw error;
+    const updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const temporaryStageRows = stageRows.map((row, index) => ({
+      ...row,
+      position: 1e6 + index,
+      updated_at: updatedAt
+    }));
+    const temporaryResult = await supabase.from("stages").upsert(temporaryStageRows);
+    if (temporaryResult.error) throw temporaryResult.error;
+    const finalResult = await supabase.from("stages").upsert(stageRows.map((row) => ({ ...row, updated_at: updatedAt })));
+    if (finalResult.error) throw finalResult.error;
   }
   const opportunityRows = deals.flatMap((deal, position) => {
     const stageId = mapStageReference(deal.stageId);
