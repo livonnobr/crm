@@ -293,3 +293,5 @@
 - [x] Manter a reorganização das metas exclusivamente por arrastar e soltar
 - [x] Destacar o card Fechamento do mês com uma cor própria
 - [x] Calcular o fechamento do mês em dias úteis, excluindo sábados, domingos e feriados
+- [x] Renomear a aplicação visível para Ritmo, removendo o sufixo CRM de Metas
+- [x] Configurar favicon da marca Ritmo
