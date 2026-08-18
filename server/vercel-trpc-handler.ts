@@ -1,7 +1,7 @@
 import { createHTTPHandler } from "@trpc/server/adapters/standalone";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { appRouter } from "../../server/routers";
-import type { TrpcContext } from "../../server/_core/context";
+import { appRouter } from "./routers";
+import type { TrpcContext } from "./_core/context";
 
 function createContext({ req, res }: { req: IncomingMessage; res: ServerResponse }): TrpcContext {
   return {
