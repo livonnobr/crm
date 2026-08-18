@@ -13,6 +13,6 @@
 
 O deploy `6a839e49f12771a757f3c8ac` foi publicado no contexto production e ficou em estado `ready` após 34 segundos. URL canônica: https://jocular-profiterole-c5dafc.netlify.app. URL imutável: https://6a839e49f12771a757f3c8ac--jocular-profiterole-c5dafc.netlify.app. O relatório do Netlify informou 3 arquivos novos, incluindo `index.html`, um redirect processado sem erros e nenhum erro de build/functions.
 
-## Validação administrativa Supabase — 17/08/2026
+## Deploy final pós-commit 18aa900
 
-A service role foi validada por teste Vitest contra o endpoint REST do projeto, sem escrita. Leituras limitadas responderam HTTP 200 para `goals`, `funnels`, `opportunities`, `prospect_lists`, `prospect_records`, `cadence_blocks` e `finance_entries`, todos sem dados retornados nessa sessão. A sondagem de `funnel_stages` respondeu 404, e a revisão do código confirmou que essa tabela não é referenciada pelo CRM; os estágios ficam estruturados dentro do fluxo de funis/oportunidades. A credencial não foi incluída no frontend.
+O build final foi gerado com `SOURCE_COMMIT=18aa90053127a640b2ab65c33f15bc628eb97886` e reenviado ao site Netlify `54eea3a3-8519-4192-9321-84aa4375b29f`. O deploy final foi `6a83a3074df3973413f5694b`, com estado `ready`, `published_at` em `2026-08-18T00:11:25.447Z`, alias canônico `https://jocular-profiterole-c5dafc.netlify.app` e URL imutável `https://6a83a3074df3973413f5694b--jocular-profiterole-c5dafc.netlify.app`. A URL canônica foi aberta no navegador e renderizou a navegação e o painel Financeiro.

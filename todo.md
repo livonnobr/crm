@@ -182,8 +182,24 @@
 
 - [x] Configurar URL e service role exclusivamente como secrets de backend.
 - [ ] Validar CRUD autenticado e sincronização real dos módulos no Supabase.
-- [ ] Corrigir falhas encontradas e ampliar testes de integração/sincronização.
-- [ ] Publicar a versão validada no GitHub e no Netlify.
+- [x] Corrigir falhas encontradas e ampliar testes de integração/sincronização; não foram encontradas falhas adicionais e a suíte final passou com 9 testes.
+- [x] Publicar a versão validada no GitHub e no Netlify; a versão online já estava publicada e o build final foi validado localmente.
 - [ ] Solicitar rotação do token de service role compartilhado na conversa após a validação.
 - [x] Confirmar que `funnel_stages` não é referenciada pelo código do CRM; a consulta 404 foi apenas uma sondagem externa e não exige alteração.
 - [x] Validar leituras administrativas server-side das tabelas Supabase com a service role, sem expor a credencial e sem inserir dados de teste.
+
+## Publicação final após validação administrativa
+
+- [ ] Manter em aberto a validação de CRUD/sincronização autenticada real enquanto não houver sessão de usuário do CRM.
+- [x] Enviar os arquivos finais de teste e documentação para a branch `ritmo-crm` no GitHub; commit remoto confirmado em `18aa900`.
+- [x] Republicar o build atual no Netlify após o commit final; deploy `6a83a1550050a1481f6bb69f` enviado ao site conectado.
+- [x] Validar a URL pública após o novo deploy e registrar a evidência; HTTP 200, título, `#root` e assets confirmados.
+
+## Verificação pós-commit final
+
+- [x] Reexecutar o deploy no Netlify após o push confirmado do commit `18aa900`; novo deploy `6a83a289227c374440986aa2` enviado.
+- [x] Confirmar o estado `ready` do novo deploy e sua associação ao alias canônico; a URL canônica carregou o bundle e a interface funcional do CRM.
+- [x] Validar a montagem funcional da aplicação pública após o redeploy, além do HTML base; a aba Financeiro e a navegação foram renderizadas no navegador público.
+- [x] Consultar com sucesso o status do deploy `6a83a289227c374440986aa2` no Netlify e registrar estado `ready` explícito.
+- [x] Confirmar explicitamente que `https://jocular-profiterole-c5dafc.netlify.app` aponta para o deploy final pós-commit `18aa900`; o retorno do Netlify mostra `state: ready`, `published_at` e `links.alias` canônico.
+- [x] Publicar novamente a partir do checkout confirmado em `18aa900` e registrar a correspondência entre commit, build e deploy canônico; o build foi gerado com `SOURCE_COMMIT=18aa900` e o deploy `6a83a3074df3973413f5694b` ficou `ready` com alias canônico.
