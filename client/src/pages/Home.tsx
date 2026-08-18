@@ -7,6 +7,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from "react";
 import {
   Activity,
+  ArrowRight,
   ArrowUpRight,
   BriefcaseBusiness,
   Building2,
@@ -48,6 +49,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
+  DialogFooter,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -178,6 +180,10 @@ type CompanyData = {
   website?: string;
   city?: string;
   __ritmoStageHistory?: string[];
+  __ritmoProspectId?: string;
+  __ritmoProspectListId?: string;
+  monthlyVisits?: string;
+  analysis?: string;
 };
 
 type Deal = {
@@ -865,6 +871,40 @@ export default function Home() {
     toast.success("Nova linha adicionada à lista de prospecção.");
   }
 
+  function importProspectList(listId: string, funnelId: string, stageId: string) {
+    const list = prospectLists.find((item) => item.id === listId);
+    const funnel = funnels.find((item) => item.id === funnelId);
+    const stage = funnel?.stages.find((item) => item.id === stageId);
+    if (!list || !funnel || !stage) {
+      toast.error("Selecione um funil e uma etapa válidos.");
+      return;
+    }
+    const existingSourceIds = new Set(deals.map((deal) => deal.companyData?.__ritmoProspectId).filter(Boolean));
+    const recordsToImport = list.records.filter((record) => !existingSourceIds.has(record.id));
+    if (!recordsToImport.length) {
+      toast.info("Todos os registros desta lista já estão no funil.");
+      return;
+    }
+    const importedDeals = recordsToImport.map((record) => ({
+      ...blankDeal,
+      id: uniqueId("deal"),
+      title: record.company.trim() || `${record.decisionMakerFirstName} ${record.decisionMakerLastName}`.trim() || "Novo prospecto",
+      company: record.company.trim() || "Empresa não informada",
+      stageId: stage.id,
+      tag: "Prospecção",
+      contactName: `${record.decisionMakerFirstName} ${record.decisionMakerLastName}`.trim(),
+      contactRole: record.decisionMakerRole,
+      contactEmail: record.decisionMakerEmail,
+      contactPhone: record.decisionMakerPhone,
+      companyData: { website: record.companyWebsite, monthlyVisits: record.monthlyVisits, analysis: record.analysis, __ritmoProspectId: record.id, __ritmoProspectListId: list.id },
+      notes: record.analysis.trim() ? [{ id: uniqueId("note"), content: record.analysis.trim(), createdAt: new Date().toISOString() }] : [],
+      stageHistory: [stage.id],
+    }));
+    setDeals((current) => [...importedDeals, ...current]);
+    toast.success(`${importedDeals.length} ${importedDeals.length === 1 ? "card criado" : "cards criados"} em ${stage.name}.`);
+    selectPage("pipeline");
+  }
+
   function updateProspect(id: string, field: keyof Omit<ProspectRecord, "id">, value: string) {
     if (!activeProspectList) return;
     setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, records: list.records.map((prospect) => prospect.id === id ? { ...prospect, [field]: value } : prospect) } : list));
@@ -1391,7 +1431,7 @@ export default function Home() {
         ) : page === "finance" ? (
           <FinanceWorkspace entries={financeEntries} onAdd={addFinanceEntry} onUpdate={updateFinanceEntry} onDelete={deleteFinanceEntry} />
         ) : (
-          <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} />
+          <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} funnels={funnels} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} onImportList={importProspectList} />
         )}
       </main>
 
@@ -1711,8 +1751,12 @@ function adaptiveFieldWidth(value: string, minimum: number) {
   return `${Math.min(Math.max(value.length + 2, minimum), 42)}ch`;
 }
 
-function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void }) {
+function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete, onImportList }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; funnels: SalesFunnel[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void; onImportList: (listId: string, funnelId: string, stageId: string) => void }) {
   const [trashOpen, setTrashOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFunnelId, setImportFunnelId] = useState(funnels[0]?.id ?? "");
+  const importFunnel = funnels.find((funnel) => funnel.id === importFunnelId) ?? funnels[0];
+  const [importStageId, setImportStageId] = useState(importFunnel?.stages[0]?.id ?? "");
   const [pendingProspectDeleteId, setPendingProspectDeleteId] = useState<string | null>(null);
   const columns: Array<{ key: keyof Omit<ProspectRecord, "id">; label: string; width: string; multiline?: boolean }> = [
     { key: "decisionMakerFirstName", label: "Nome do decisor", width: "min-w-[170px]" },
@@ -1733,9 +1777,19 @@ function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListNam
       <header className="flex flex-wrap items-center gap-3 border-b border-[#E2E7E1] pb-3">
         <div className="mr-auto flex min-w-[220px] items-center gap-2"><div><p className="eyebrow">Prospecção comercial</p><div className="mt-0.5 flex items-center gap-2"><h1 className="page-title text-2xl">Empresas</h1><span className="h-2 w-2 rounded-full bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.12)]" /></div></div></div>
         <div className="flex min-w-0 items-center gap-2 rounded-xl border border-[#DDE5DE] bg-[#FCFCFA] px-2 py-1.5"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={17} /></div><label htmlFor="prospect-list-select" className="sr-only">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="block max-w-[180px] truncate border-0 bg-transparent p-0 pr-7 text-sm font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} className="h-8 w-[160px] rounded-lg border border-[#DDE5DE] bg-white px-2.5 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-8 gap-1 rounded-lg border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={14} />Nova lista</Button><Button variant="outline" onClick={onDeleteList} className="h-8 gap-1 rounded-lg border-[#F0D5D1] px-2.5 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={14} />Excluir</Button><Button variant="outline" onClick={() => setTrashOpen((open) => !open)} className="h-8 gap-1 rounded-lg border-[#DDE5DE] px-2.5 text-xs font-extrabold text-[#63706B] hover:bg-[#F3F5F1]"><Trash2 size={14} />Lixeira{trashedLists.length ? ` (${trashedLists.length})` : ""}</Button></div>
-        <div className="flex gap-2"><Button onClick={onAdd} className="h-9 gap-1.5 rounded-xl bg-[#10A97A] px-3 font-bold hover:bg-[#087E5A]"><Plus size={17} />Nova linha</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "csv")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />CSV</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "xls")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />Excel</Button></div>
+        <div className="flex flex-wrap gap-2"><Button onClick={() => setImportOpen(true)} variant="outline" className="h-9 gap-1.5 rounded-xl border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><ArrowRight size={15} />Adicionar ao funil</Button><Button onClick={onAdd} className="h-9 gap-1.5 rounded-xl bg-[#10A97A] px-3 font-bold hover:bg-[#087E5A]"><Plus size={17} />Nova linha</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "csv")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />CSV</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "xls")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />Excel</Button></div>
       </header>
       {trashOpen && <section className="mt-3 rounded-2xl border border-[#E4DDD5] bg-[#FFFDF9] p-4 shadow-[0_8px_22px_rgba(75,61,43,0.04)]"><div className="flex flex-col gap-2 border-b border-[#EEE6DC] pb-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><p className="text-sm font-extrabold text-[#3B3934]">Lixeira</p><span className="h-1.5 w-1.5 rounded-full bg-[#D8952E]" /></div><p className="mt-1 text-xs text-[#8B8177]">Listas excluídas ficam disponíveis por 30 dias para restauração.</p></div><span className="rounded-full bg-[#FFF2D9] px-3 py-1.5 text-xs font-extrabold text-[#9A6819]">{trashedLists.length} {trashedLists.length === 1 ? "lista" : "listas"}</span></div>{trashedLists.length ? <div className="mt-3 space-y-2">{trashedLists.map((list) => { const daysLeft = Math.max(0, Math.ceil((new Date(list.deletedAt).getTime() + PROSPECT_TRASH_RETENTION_MS - Date.now()) / (24 * 60 * 60 * 1000))); return <div key={list.id} className="flex flex-col gap-3 rounded-xl border border-[#EEE6DC] bg-white p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate text-sm font-bold text-[#3B3934]">{list.name || "Lista sem nome"}</p><p className="mt-1 text-xs text-[#8B8177]">{list.records.length} {list.records.length === 1 ? "registro" : "registros"} · expira em {daysLeft} {daysLeft === 1 ? "dia" : "dias"}</p></div><div className="flex shrink-0 gap-2"><Button variant="outline" onClick={() => onRestoreList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5E] hover:bg-[#E8F6F0]"><RotateCcw size={14} />Restaurar</Button><Button variant="outline" onClick={() => onPermanentDeleteList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#F0D5D1] px-3 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={14} />Excluir definitivamente</Button></div></div>; })}</div> : <p className="mt-4 text-sm text-[#8B8177]">A Lixeira está vazia.</p>}</section>}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-md rounded-2xl border-[#DDE5DE] bg-[#FFFDF9]">
+          <DialogHeader><DialogTitle>Adicionar lista ao funil</DialogTitle><DialogDescription>{prospects.length} {prospects.length === 1 ? "registro será convertido em card." : "registros serão convertidos em cards individuais."}</DialogDescription></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div><label className="mb-1.5 block text-xs font-extrabold uppercase tracking-[0.12em] text-[#75837C]">Funil de destino</label><select value={importFunnelId} onChange={(event) => { const nextFunnelId = event.target.value; setImportFunnelId(nextFunnelId); setImportStageId(funnels.find((funnel) => funnel.id === nextFunnelId)?.stages[0]?.id ?? ""); }} className="h-11 w-full rounded-xl border border-[#DDE5DE] bg-white px-3 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]">{funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}</select></div>
+            <div><label className="mb-1.5 block text-xs font-extrabold uppercase tracking-[0.12em] text-[#75837C]">Etapa de destino</label><select value={importStageId} onChange={(event) => setImportStageId(event.target.value)} className="h-11 w-full rounded-xl border border-[#DDE5DE] bg-white px-3 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]">{(importFunnel?.stages ?? []).map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setImportOpen(false)} className="rounded-xl">Cancelar</Button><Button onClick={() => { onImportList(activeListId, importFunnelId, importStageId); setImportOpen(false); }} disabled={!prospects.length || !importFunnelId || !importStageId} className="rounded-xl bg-[#10A97A] font-bold hover:bg-[#087E5A]">Criar cards</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="mt-6 max-w-sm">
         <ProspectingMetric label="Empresas preenchidas" value={companyCount.toString()} detail="empresas com nome cadastrado" accent />
       </div>

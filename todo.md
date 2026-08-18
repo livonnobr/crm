@@ -221,3 +221,7 @@
 
 - [x] Adicionar o campo Visitas mensais à grade, modelo, persistência Supabase e exportação de Empresas.
 - [x] Validar testes, build, checkpoint e publicação da melhoria Visitas mensais.
+
+- [x] Adicionar ação nas listas de Empresas para escolher funil e etapa de destino.
+- [x] Converter cada registro da lista em um card individual, preservando dados comerciais relevantes.
+- [x] Validar duplicidade, persistência no Supabase, testes, build e publicação da integração Empresas-Funil.
