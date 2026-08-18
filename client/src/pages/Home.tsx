@@ -545,9 +545,9 @@ export default function Home() {
   // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
   // startLogin() during render (no href={startLogin()}) — it mints a one-time
   // nonce cookie and must run only at the moment of navigation.
-  let { user, loading, error, isAuthenticated, logout } = useAuth({ redirectOnUnauthenticated: true });
-  const workspaceBootstrap = trpc.workspace.bootstrap.useQuery(undefined, { enabled: isAuthenticated });
-  const workspaceSnapshot = trpc.workspace.snapshot.useQuery(undefined, { enabled: isAuthenticated });
+  let { user, loading, error, isAuthenticated, logout } = useAuth({ redirectOnUnauthenticated: false });
+  const workspaceBootstrap = trpc.workspace.bootstrap.useQuery();
+  const workspaceSnapshot = trpc.workspace.snapshot.useQuery();
   const syncWorkspaceMutation = trpc.workspace.sync.useMutation();
 
   const [page, setPage] = useState<Page>(() => {
@@ -723,7 +723,7 @@ export default function Home() {
       if (!isAuthenticated) setIsCloudLoading(false);
       return;
     }
-    setAccountEmail(user?.email ?? null);
+    setAccountEmail(user?.email ?? "Workspace Ritmo");
     void loadCloudWorkspace(workspaceSnapshot.data.workspaceId);
   }, [workspaceSnapshot.data?.workspaceId, workspaceSnapshot.data?.snapshot, isAuthenticated, user?.email]);
 
@@ -761,84 +761,19 @@ export default function Home() {
   }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, financeEntries, workspaceId]);
 
   useEffect(() => {
-    if (!workspaceId || !supabase || isCloudHydrating) return;
-    if (isAuthenticated) {
-      void syncWorkspaceMutation.mutateAsync({ state: {
-        goals: goals.map((goal) => ({ ...goal, period: goalPeriodValue(goal) })),
-        funnels,
-        deals: deals.map((deal) => ({ ...deal, companyData: { ...(deal.companyData ?? {}), __ritmoStageEvents: stageEventsForDeal(deal) } })),
-        conversionRates,
-        prospectLists,
-        trashedProspectLists,
-        cadenceBlocks,
-        financeEntries,
-      } }).catch(() => toast.error("Não foi possível sincronizar os dados com o Supabase."));
-      return;
-    }
-    const client = getSupabaseClient();
-    const stageToFunnel = new Map(funnels.flatMap((funnel) => funnel.stages.map((stage) => [stage.id, funnel.id] as const)));
-    const syncCloudState = async () => {
-      if (goals.length) await client.from("goals").upsert(goals.map((goal, position) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color, recurring: goal.recurring, monthly_overrides: goal.monthlyOverrides ?? {}, linked_funnel_id: goal.linkedFunnelId || null, linked_stage_id: goal.linkedStageId || null, position })));
-      await client.from("conversion_settings").upsert({ workspace_id: workspaceId, rates: conversionRates, updated_at: new Date().toISOString() });
-      const funnelIds = funnels.map((funnel) => funnel.id);
-      const { data: remoteFunnels } = await client.from("funnels").select("id").eq("workspace_id", workspaceId);
-      const staleFunnelIds = ((remoteFunnels ?? []) as Array<{ id: string }>).map((funnel) => funnel.id).filter((id) => !funnelIds.includes(id));
-      if (staleFunnelIds.length) {
-        await client.from("opportunities").delete().in("funnel_id", staleFunnelIds);
-        await client.from("stages").delete().in("funnel_id", staleFunnelIds);
-        await client.from("funnels").delete().in("id", staleFunnelIds);
-      }
-      if (funnels.length) await client.from("funnels").upsert(funnels.map((funnel, position) => ({ id: funnel.id, workspace_id: workspaceId, name: funnel.name, currency: funnel.currency, position })));
-      const stageRows = funnels.flatMap((funnel) => funnel.stages.map((stage, position) => ({ id: stage.id, funnel_id: funnel.id, name: stage.name, color: stage.color, probability: stage.probability, position })));
-      if (funnelIds.length) {
-        const { data: remoteStages } = await client.from("stages").select("id, funnel_id").in("funnel_id", funnelIds);
-        const stageIds = stageRows.map((stage) => stage.id);
-        const staleStageIds = ((remoteStages ?? []) as Array<{ id: string; funnel_id: string }>).map((stage) => stage.id).filter((id) => !stageIds.includes(id));
-        if (staleStageIds.length) await client.from("stages").delete().in("id", staleStageIds);
-      }
-      if (stageRows.length) await client.from("stages").upsert(stageRows);
-      const opportunityRows = deals.flatMap((deal, position) => {
-        const funnelId = stageToFunnel.get(deal.stageId);
-        return funnelId ? [{ id: deal.id, funnel_id: funnelId, stage_id: deal.stageId, title: deal.title, company: deal.company, value: deal.value, owner_initials: deal.owner, tag: deal.tag, next_activity: deal.nextActivity, contact_name: deal.contactName ?? null, contact_role: deal.contactRole ?? null, contact_email: deal.contactEmail ?? null, contact_phone: deal.contactPhone ?? null, company_data: { ...(deal.companyData ?? {}), __ritmoStageHistory: deal.stageHistory ?? [deal.stageId], __ritmoStageEvents: stageEventsForDeal(deal) }, activities: deal.activities ?? [], notes: deal.notes ?? [], position }] : [];
-      });
-      if (funnelIds.length) {
-        const { data: remoteOpportunities } = await client.from("opportunities").select("id, funnel_id").in("funnel_id", funnelIds);
-        const opportunityIds = opportunityRows.map((deal) => deal.id);
-        const staleOpportunityIds = ((remoteOpportunities ?? []) as Array<{ id: string; funnel_id: string }>).map((deal) => deal.id).filter((id) => !opportunityIds.includes(id));
-        if (staleOpportunityIds.length) await client.from("opportunities").delete().in("id", staleOpportunityIds);
-      }
-      if (opportunityRows.length) await client.from("opportunities").upsert(opportunityRows);
-
-      const desiredProspectLists = [...prospectLists, ...trashedProspectLists];
-      const desiredListIds = desiredProspectLists.map((list) => list.id);
-      const { data: existingProspectLists } = await client.from("prospect_lists").select("id").eq("workspace_id", workspaceId);
-      const staleListIds = ((existingProspectLists ?? []) as Array<{ id: string }>).map((list) => list.id).filter((id) => !desiredListIds.includes(id));
-      if (staleListIds.length) await client.from("prospect_lists").delete().in("id", staleListIds);
-      if (desiredProspectLists.length) {
-        await client.from("prospect_lists").upsert(desiredProspectLists.map((list) => ({ id: list.id, workspace_id: workspaceId, name: list.name, deleted_at: "deletedAt" in list ? list.deletedAt : null, updated_at: new Date().toISOString() })));
-      }
-      const prospectRecordRows = desiredProspectLists.flatMap((list) => list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_role: record.decisionMakerRole, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, decision_maker_secondary_phone: record.decisionMakerSecondaryPhone, monthly_visits: record.monthlyVisits, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
-      for (const list of desiredProspectLists) {
-        const { data: existingRecords } = await client.from("prospect_records").select("id").eq("list_id", list.id);
-        const desiredRecordIds = list.records.map((record) => record.id);
-        const staleRecordIds = ((existingRecords ?? []) as Array<{ id: string }>).map((record) => record.id).filter((id) => !desiredRecordIds.includes(id));
-        if (staleRecordIds.length) await client.from("prospect_records").delete().in("id", staleRecordIds);
-      }
-      if (prospectRecordRows.length) await client.from("prospect_records").upsert(prospectRecordRows);
-
-      const { data: existingCadenceBlocks } = await client.from("cadence_blocks").select("id").eq("workspace_id", workspaceId);
-      const cadenceIds = cadenceBlocks.map((block) => block.id);
-      const staleCadenceIds = ((existingCadenceBlocks ?? []) as Array<{ id: string }>).map((block) => block.id).filter((id) => !cadenceIds.includes(id));
-      if (staleCadenceIds.length) await client.from("cadence_blocks").delete().in("id", staleCadenceIds);
-      if (cadenceBlocks.length) await client.from("cadence_blocks").upsert(cadenceBlocks.map((block, position) => ({ id: block.id, workspace_id: workspaceId, day: block.day, slot: block.slot, title: block.title, channel: block.channel, notes: block.notes, position, updated_at: new Date().toISOString() })));
-      const { data: existingFinanceEntries } = await client.from("finance_entries").select("id").eq("workspace_id", workspaceId);
-      const financeIds = financeEntries.map((entry) => entry.id);
-      const staleFinanceIds = ((existingFinanceEntries ?? []) as Array<{ id: string }>).map((entry) => entry.id).filter((id) => !financeIds.includes(id));
-      if (staleFinanceIds.length) await client.from("finance_entries").delete().in("id", staleFinanceIds);
-      if (financeEntries.length) await client.from("finance_entries").upsert(financeEntries.map((entry, position) => ({ id: entry.id, workspace_id: workspaceId, expense: entry.expense, amount: entry.amount, installment: entry.installment, due_date: entry.dueDate || null, notes: entry.notes, position, updated_at: new Date().toISOString() })));
-    };
-    void syncCloudState();
-  }, [goals, funnels, deals, conversionRates, prospectLists, trashedProspectLists, cadenceBlocks, financeEntries, workspaceId, isCloudHydrating, isAuthenticated]);
+    if (!workspaceId || isCloudHydrating) return;
+    void syncWorkspaceMutation.mutateAsync({ state: {
+      goals: goals.map((goal) => ({ ...goal, period: goalPeriodValue(goal) })),
+      funnels,
+      deals: deals.map((deal) => ({ ...deal, companyData: { ...(deal.companyData ?? {}), __ritmoStageEvents: stageEventsForDeal(deal) } })),
+      conversionRates,
+      prospectLists,
+      trashedProspectLists,
+      cadenceBlocks,
+      financeEntries,
+    } }).catch(() => toast.error("Não foi possível sincronizar os dados com o Supabase."));
+    return;
+  }, [goals, funnels, deals, conversionRates, prospectLists, trashedProspectLists, cadenceBlocks, financeEntries, workspaceId, isCloudHydrating]);
 
   const activeFunnel = funnels.find((funnel) => funnel.id === activeFunnelId) ?? funnels[0];
   const funnelDeals = useMemo(
@@ -1479,7 +1414,7 @@ export default function Home() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarItem icon={<Activity size={18} />} label="Ritmo do mês" onClick={() => setPage("goals")} />
-              <SidebarItem icon={<Settings size={18} />} label="Configurações" onClick={() => setAuthDialogOpen(true)} />
+              <SidebarItem icon={<Settings size={18} />} label="Configurações" onClick={() => toast.info("Configurações do workspace em breve.")} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -1493,9 +1428,9 @@ export default function Home() {
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip={accountEmail ? "Conta conectada" : isSupabaseConfigured ? "Conectar à nuvem" : "Modo local"} onClick={() => accountEmail ? void signOutOfCloud() : setAuthDialogOpen(true)} className="h-auto rounded-xl px-2 py-2 text-left hover:bg-[#F0F3EF]">
+            <SidebarMenuButton tooltip="Workspace conectado" className="h-auto rounded-xl px-2 py-2 text-left hover:bg-[#F0F3EF]">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#18201E] text-[9px] font-bold text-white">{accountEmail ? accountEmail.slice(0, 2).toUpperCase() : "AR"}</span>
-              <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><span className="block truncate text-sm font-bold text-[#27302D]">{accountEmail ? "Conta conectada" : isSupabaseConfigured ? "Conectar à nuvem" : "Modo local"}</span><span className="block truncate text-xs text-[#87928D]">{accountEmail ?? (isCloudLoading ? "Carregando conexão..." : isSupabaseConfigured ? "Entrar com e-mail" : "Dados neste navegador")}</span></span>
+              <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><span className="block truncate text-sm font-bold text-[#27302D]">Workspace conectado</span><span className="block truncate text-xs text-[#87928D]">Sincronização automática com Supabase</span></span>
               <ChevronDown className="h-4 w-4 text-[#87928D] group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -1669,12 +1604,12 @@ export default function Home() {
         onEditOpportunity={() => detailDeal && openEditDeal(detailDeal)}
       />
 
-      <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
+      {false && <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
         <DialogContent className="max-w-[460px] border-[#E2E7E0] bg-[#FCFCFA] p-0">
           <div className="border-b border-[#E8ECE6] px-6 py-5"><DialogHeader><DialogTitle className="font-display text-2xl tracking-[-0.04em]">Conectar ao Ritmo</DialogTitle><DialogDescription>Use seu e-mail para abrir um espaço comercial protegido e sincronizado no Supabase.</DialogDescription></DialogHeader></div>
           <form onSubmit={sendMagicLink} className="space-y-5 px-6 py-6"><FormField label="Seu e-mail"><Input type="email" autoFocus value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="voce@empresa.com" /></FormField><div className="flex justify-end gap-2 border-t border-[#E8ECE6] pt-5"><Button type="button" variant="outline" onClick={() => setAuthDialogOpen(false)}>Cancelar</Button><Button disabled={isAuthSending} type="submit" className="bg-[#10A97A] hover:bg-[#087E5A]">{isAuthSending ? "Enviando..." : "Enviar link de acesso"}</Button></div></form>
         </DialogContent>
-      </Dialog>
+      </Dialog>}
     </SidebarProvider>
   );
 }
@@ -1918,7 +1853,7 @@ function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, acti
         <div className="flex min-w-0 items-center gap-2 rounded-xl border border-[#DDE5DE] bg-[#FCFCFA] px-2 py-1.5"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={17} /></div><label htmlFor="prospect-list-select" className="sr-only">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="block max-w-[180px] truncate border-0 bg-transparent p-0 pr-7 text-sm font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} className="h-8 w-[160px] rounded-lg border border-[#DDE5DE] bg-white px-2.5 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-8 gap-1 rounded-lg border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={14} />Nova lista</Button><Button variant="outline" onClick={onDeleteList} className="h-8 gap-1 rounded-lg border-[#F0D5D1] px-2.5 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={14} />Excluir</Button><Button variant="outline" onClick={() => setTrashOpen((open) => !open)} className="h-8 gap-1 rounded-lg border-[#DDE5DE] px-2.5 text-xs font-extrabold text-[#63706B] hover:bg-[#F3F5F1]"><Trash2 size={14} />Lixeira{trashedLists.length ? ` (${trashedLists.length})` : ""}</Button></div>
         <div className="flex flex-wrap gap-2"><Button type="button" onClick={onSave} disabled={isSaving} className="h-9 min-w-[148px] gap-1.5 rounded-xl bg-[#10A97A] px-3 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(16,169,122,0.18)] hover:bg-[#087E5E]">{isSaving ? "Salvando…" : cloudConnected ? "Salvar alterações" : "Salvar no Supabase"}</Button><Button onClick={() => setImportOpen(true)} variant="outline" className="h-9 gap-1.5 rounded-xl border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><ArrowRight size={15} />Adicionar ao funil</Button><Button onClick={onAdd} className="h-9 gap-1.5 rounded-xl bg-[#10A97A] px-3 font-bold hover:bg-[#087E5A]"><Plus size={17} />Nova linha</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "csv")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />CSV</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "xls")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />Excel</Button></div>
       </header>
-      <div className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs ${cloudConnected ? "border-[#CBE5D7] bg-[#F0F8F3] text-[#087E5A]" : "border-[#E7D5A8] bg-[#FFF9E8] text-[#80621D]"}`}><div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${cloudConnected ? "bg-[#10A97A]" : "bg-[#C88920]"}`} /><span>{persistenceLabel(cloudConnected ? "workspace" : null)}</span></div>{!cloudConnected && <Button type="button" onClick={onConnect} variant="outline" className="h-7 rounded-lg border-[#C88920] px-2.5 text-[11px] font-extrabold text-[#80621D] hover:bg-[#FFF2D9]">Conectar conta</Button>}</div>
+      <div className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs ${cloudConnected ? "border-[#CBE5D7] bg-[#F0F8F3] text-[#087E5A]" : "border-[#E7D5A8] bg-[#FFF9E8] text-[#80621D]"}`}><div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${cloudConnected ? "bg-[#10A97A]" : "bg-[#C88920]"}`} /><span>{persistenceLabel(cloudConnected ? "workspace" : null)}</span></div></div>
       {trashOpen && <section className="mt-3 rounded-2xl border border-[#E4DDD5] bg-[#FFFDF9] p-4 shadow-[0_8px_22px_rgba(75,61,43,0.04)]"><div className="flex flex-col gap-2 border-b border-[#EEE6DC] pb-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><p className="text-sm font-extrabold text-[#3B3934]">Lixeira</p><span className="h-1.5 w-1.5 rounded-full bg-[#D8952E]" /></div><p className="mt-1 text-xs text-[#8B8177]">Listas excluídas ficam disponíveis por 30 dias para restauração.</p></div><span className="rounded-full bg-[#FFF2D9] px-3 py-1.5 text-xs font-extrabold text-[#9A6819]">{trashedLists.length} {trashedLists.length === 1 ? "lista" : "listas"}</span></div>{trashedLists.length ? <div className="mt-3 space-y-2">{trashedLists.map((list) => { const daysLeft = Math.max(0, Math.ceil((new Date(list.deletedAt).getTime() + PROSPECT_TRASH_RETENTION_MS - Date.now()) / (24 * 60 * 60 * 1000))); return <div key={list.id} className="flex flex-col gap-3 rounded-xl border border-[#EEE6DC] bg-white p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate text-sm font-bold text-[#3B3934]">{list.name || "Lista sem nome"}</p><p className="mt-1 text-xs text-[#8B8177]">{list.records.length} {list.records.length === 1 ? "registro" : "registros"} · expira em {daysLeft} {daysLeft === 1 ? "dia" : "dias"}</p></div><div className="flex shrink-0 gap-2"><Button variant="outline" onClick={() => onRestoreList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5E] hover:bg-[#E8F6F0]"><RotateCcw size={14} />Restaurar</Button><Button variant="outline" onClick={() => onPermanentDeleteList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#F0D5D1] px-3 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={14} />Excluir definitivamente</Button></div></div>; })}</div> : <p className="mt-4 text-sm text-[#8B8177]">A Lixeira está vazia.</p>}</section>}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="max-w-md rounded-2xl border-[#DDE5DE] bg-[#FFFDF9]">

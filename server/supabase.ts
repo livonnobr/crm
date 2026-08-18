@@ -18,9 +18,9 @@ function getAdminClient() {
 export async function ensureWorkspaceForOwner(owner: {
   email?: string | null;
   name?: string | null;
-}) {
-  const email = owner.email?.trim().toLowerCase();
-  if (!email) throw new Error("O usuário autenticado não possui e-mail para vincular ao Supabase.");
+} = {}) {
+  const email = (owner.email ?? ENV.ownerEmail).trim().toLowerCase();
+  if (!email) throw new Error("OWNER_EMAIL não está configurado no servidor para vincular o workspace Supabase.");
 
   const supabase = getAdminClient();
   const users = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -31,7 +31,7 @@ export async function ensureWorkspaceForOwner(owner: {
     const created = await supabase.auth.admin.createUser({
       email,
       email_confirm: true,
-      user_metadata: { name: owner.name ?? email, source: "ritmo-manus-auth" },
+      user_metadata: { name: owner.name ?? (ENV.ownerOpenId || email), source: "ritmo-owner-workspace" },
     });
     if (created.error) throw created.error;
     authUser = created.data.user;

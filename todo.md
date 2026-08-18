@@ -359,3 +359,5 @@
 - [x] Corrigir TypeError Invalid URL ao abrir a aba Empresas diretamente por `?aba=prospeccao` na produção Vercel
 
 - [x] Reduzir e reposicionar as informações superiores do card Fechamento do mês para não sobrepor o calendário
+
+- [x] Remover o redirecionamento obrigatório para login Manus e usar automaticamente o workspace Supabase configurado do proprietário
