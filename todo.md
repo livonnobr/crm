@@ -316,3 +316,5 @@
 - [x] Aumentar o título de cada card de meta mantendo a responsividade e os controles atuais
 
 - [x] Adicionar um calendário visual do mês como fundo do card Fechamento do mês, preservando contraste e legibilidade
+
+- [x] Permitir personalizar uma meta recorrente apenas no mês selecionado, preservando a regra recorrente nos demais meses e persistindo a exceção

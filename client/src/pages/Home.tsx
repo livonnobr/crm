@@ -132,6 +132,7 @@ type GoalItem = {
   linkedFunnelId?: string;
   linkedStageId?: string;
   color: "emerald" | "blue" | "amber" | "violet";
+  monthlyOverrides?: Record<string, { target: number; actual: number }>;
 };
 
 type Stage = {
@@ -230,6 +231,7 @@ type GoalRecord = {
   linked_funnel_id?: string | null;
   linked_stage_id?: string | null;
   recurring?: boolean | null;
+  monthly_overrides?: Record<string, { target: number; actual: number }> | null;
   position?: number | null;
 };
 
@@ -379,6 +381,7 @@ const blankGoal: GoalItem = {
   linkedFunnelId: "",
   linkedStageId: "",
   color: "emerald",
+  monthlyOverrides: {},
 };
 
 const initialProspects: ProspectRecord[] = [];
@@ -477,6 +480,11 @@ function progressOf(goal: GoalItem) {
   return Math.min(100, Math.round((goal.actual / Math.max(goal.target, 1)) * 100));
 }
 
+function goalValuesForMonth(goal: GoalItem, month: string) {
+  const override = goal.recurring ? goal.monthlyOverrides?.[month] : undefined;
+  return override ? { ...goal, target: override.target, actual: override.actual } : goal;
+}
+
 const LEGACY_STAGE_EVENT_DATE = new Date().toISOString();
 
 function stageEventsForDeal(deal: Deal): StageEvent[] {
@@ -566,6 +574,7 @@ export default function Home() {
   const [isAuthSending, setIsAuthSending] = useState(false);
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [goalDraft, setGoalDraft] = useState<GoalItem>(blankGoal);
+  const [goalOverrideMonth, setGoalOverrideMonth] = useState<string | null>(null);
   const [dealDialogOpen, setDealDialogOpen] = useState(false);
   const [dealDraft, setDealDraft] = useState<Deal>(blankDeal);
   const [funnelDialogOpen, setFunnelDialogOpen] = useState(false);
@@ -675,6 +684,7 @@ export default function Home() {
       color: goal.color,
       linkedFunnelId: goal.linked_funnel_id ?? "",
       linkedStageId: goal.linked_stage_id ?? "",
+      monthlyOverrides: goal.monthly_overrides ?? {},
     }));
     const normalizedStages = (stageRows ?? []) as StageRecord[];
     const normalizedFunnels = cloudFunnels.map((funnel) => ({
@@ -784,7 +794,7 @@ export default function Home() {
     const client = getSupabaseClient();
     const stageToFunnel = new Map(funnels.flatMap((funnel) => funnel.stages.map((stage) => [stage.id, funnel.id] as const)));
     const syncCloudState = async () => {
-      if (goals.length) await client.from("goals").upsert(goals.map((goal, position) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color, recurring: goal.recurring, linked_funnel_id: goal.linkedFunnelId || null, linked_stage_id: goal.linkedStageId || null, position })));
+      if (goals.length) await client.from("goals").upsert(goals.map((goal, position) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goalPeriodValue(goal), color: goal.color, recurring: goal.recurring, monthly_overrides: goal.monthlyOverrides ?? {}, linked_funnel_id: goal.linkedFunnelId || null, linked_stage_id: goal.linkedStageId || null, position })));
       await client.from("conversion_settings").upsert({ workspace_id: workspaceId, rates: conversionRates, updated_at: new Date().toISOString() });
       const funnelIds = funnels.map((funnel) => funnel.id);
       const { data: remoteFunnels } = await client.from("funnels").select("id").eq("workspace_id", workspaceId);
@@ -1092,13 +1102,15 @@ export default function Home() {
     toast.success("Sessão encerrada. Seus dados continuam salvos na nuvem.");
   }
 
-  function openNewGoal() {
+    function openNewGoal() {
+    setGoalOverrideMonth(null);
     setGoalDraft({ ...blankGoal, id: "" });
     setGoalDialogOpen(true);
   }
-
   function openEditGoal(goal: GoalItem) {
-    setGoalDraft(goal);
+    const override = goal.recurring ? goal.monthlyOverrides?.[selectedGoalMonth] : undefined;
+    setGoalOverrideMonth(override ? selectedGoalMonth : null);
+    setGoalDraft(override ? { ...goal, target: override.target, actual: override.actual } : goal);
     setGoalDialogOpen(true);
   }
 
@@ -1133,15 +1145,21 @@ export default function Home() {
       return;
     }
     if (goalDraft.id) {
-      setGoals((current) => current.map((goal) => (goal.id === goalDraft.id ? goalDraft : goal)));
-      toast.success("Meta atualizada.");
+      setGoals((current) => current.map((goal) => {
+        if (goal.id !== goalDraft.id) return goal;
+        if (goalOverrideMonth && goal.recurring) {
+          return { ...goal, monthlyOverrides: { ...(goal.monthlyOverrides ?? {}), [goalOverrideMonth]: { target: goalDraft.target, actual: goalDraft.actual } } };
+        }
+        return { ...goalDraft, monthlyOverrides: goal.monthlyOverrides ?? goalDraft.monthlyOverrides ?? {} };
+      }));
+      toast.success(goalOverrideMonth ? `Exceção salva para ${goalOverrideMonth}.` : "Meta atualizada.");
     } else {
       setGoals((current) => [{ ...goalDraft, id: uniqueId("goal"), position: 0 }, ...current.map((goal, index) => ({ ...goal, position: index + 1 }))]);
       toast.success("Meta criada e adicionada ao seu ritmo.");
     }
+        setGoalOverrideMonth(null);
     setGoalDialogOpen(false);
   }
-
   async function deleteGoal(goalId: string) {
     if (workspaceId && supabase) {
       const { error } = await getSupabaseClient().from("goals").delete().eq("id", goalId);
@@ -1581,7 +1599,8 @@ export default function Home() {
               <FormField label="Realizado até agora"><Input min="0" type="number" value={goalDraft.actual || ""} onChange={(event) => setGoalDraft({ ...goalDraft, actual: Number(event.target.value) })} placeholder="0" /></FormField>
             </div>
             <div className="grid gap-4 sm:grid-cols-2"><FormField label="Periodicidade"><select className="form-select" value={goalDraft.cadence} onChange={(event) => { const cadence = event.target.value as GoalCadence; setGoalDraft({ ...goalDraft, cadence, period: goalPeriodInputValue({ ...goalDraft, cadence }) }); }}><option>Diária</option><option>Semanal</option><option>Mensal</option></select></FormField><FormField label={goalDraft.cadence === "Mensal" ? "Mês da meta" : goalDraft.cadence === "Semanal" ? "Semana da meta" : "Dia da meta"}><Input type={goalPeriodInputType(goalDraft.cadence)} value={goalPeriodInputValue(goalDraft)} onChange={(event) => setGoalDraft({ ...goalDraft, period: event.target.value })} aria-label="Selecionar período da meta" className="bg-white" /></FormField></div>
-            <label className="flex items-center gap-3 rounded-xl border border-[#DDE8E1] bg-[#F5FAF7] px-3 py-3 text-sm font-semibold text-[#35403B]"><input type="checkbox" checked={goalDraft.recurring} onChange={(event) => setGoalDraft({ ...goalDraft, recurring: event.target.checked })} className="h-4 w-4 accent-[#10A97A]" />Meta recorrente<span className="ml-auto text-xs font-medium text-[#7D8983]">Repete sem duplicar</span></label>
+            <label className="flex items-center gap-3 rounded-xl border border-[#DDE8E1] bg-[#F5FAF7] px-3 py-3 text-sm font-semibold text-[#35403B]"><input type="checkbox" checked={goalDraft.recurring} onChange={(event) => { const recurring = event.target.checked; setGoalDraft({ ...goalDraft, recurring }); if (!recurring) setGoalOverrideMonth(null); }} className="h-4 w-4 accent-[#10A97A]" />Meta recorrente<span className="ml-auto text-xs font-medium text-[#7D8983]">Repete sem duplicar</span></label>
+            {goalDraft.id && goalDraft.recurring && <label className="flex items-center gap-3 rounded-xl border border-[#DDE8E1] bg-[#FFF9E8] px-3 py-3 text-sm font-semibold text-[#35403B]"><input type="checkbox" checked={goalOverrideMonth === selectedGoalMonth} onChange={(event) => { if (event.target.checked) { const effective = goalValuesForMonth(goalDraft, selectedGoalMonth); setGoalDraft({ ...goalDraft, target: effective.target, actual: effective.actual }); setGoalOverrideMonth(selectedGoalMonth); } else { const baseGoal = goals.find((goal) => goal.id === goalDraft.id); if (baseGoal) setGoalDraft(baseGoal); setGoalOverrideMonth(null); } }} className="h-4 w-4 accent-[#C88920]" />Personalizar apenas {selectedGoalMonth}<span className="ml-auto text-xs font-medium text-[#8A6D2A]">Não altera a recorrência</span></label>}
             <FormField label="Atualização automática pelo funil"><select className="form-select" value={goalDraft.linkedStageId ?? ""} onChange={(event) => { const stageId = event.target.value; const funnel = funnels.find((item) => item.stages.some((stage) => stage.id === stageId)); setGoalDraft({ ...goalDraft, linkedStageId: stageId, linkedFunnelId: funnel?.id ?? "" }); }}><option value="">Sem vínculo automático</option>{funnels.flatMap((funnel) => funnel.stages.map((stage) => <option key={`${funnel.id}-${stage.id}`} value={stage.id}>{funnel.name} · {stage.name}</option>))}</select><p className="mt-1 text-xs text-[#7D8983]">Cada oportunidade conta uma vez quando entra na etapa escolhida.</p></FormField>
             <div className="flex items-center justify-between border-t border-[#E8ECE6] pt-5">
               {goalDraft.id ? <button type="button" onClick={() => deleteGoal(goalDraft.id)} className="inline-flex items-center gap-2 text-sm font-bold text-[#B04A43]"><Trash2 size={16} />Excluir</button> : <span />}
@@ -1758,9 +1777,10 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
       <div className="px-5 pb-12 md:px-10">
         <section className="instrument-strip" aria-label="Instrumentos de acompanhamento comercial">
           {goals.map((goal, index) => {
-            const progress = progressOf(goal);
-            const remaining = Math.max(goal.target - goal.actual, 0);
-            return <div key={goal.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", goal.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const fromId = event.dataTransfer.getData("text/plain"); if (fromId) onReorderGoals(fromId, goal.id); }} className="instrument-cell group cursor-grab active:cursor-grabbing"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 flex-wrap items-center gap-2"><span className="pulse-dot" /><span className="rounded-full bg-[#F0F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#63736B]">{goal.cadence}</span>{goal.recurring && <span className="rounded-full bg-[#E7F5EF] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#087E5E]">Recorrente</span>}<span className="text-xs text-[#88938E]">{goal.recurring ? periodValueForDate(goal.cadence) : cleanGoalPeriod(goal.period)}</span></div><div className="flex items-center gap-1"><span className="text-xs font-extrabold text-[#087E5A]">{progress}%</span><button type="button" onClick={() => onEditGoal(goal)} className="icon-button h-7 w-7 opacity-70 transition hover:opacity-100" aria-label={`Editar ${goal.title}`}><Pencil size={13} /></button><button type="button" onClick={() => onDeleteGoal(goal.id)} className="icon-button h-7 w-7 text-[#B04D45] opacity-70 transition hover:opacity-100" aria-label={`Excluir ${goal.title}`}><Trash2 size={13} /></button></div></div><div className="mt-3 flex items-center gap-3"><div className="goal-meter shrink-0" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div className="min-w-0 flex-1"><p className="truncate text-base font-bold tracking-[-0.02em] text-[#27302D]">{goal.title}</p><p className="mt-0.5 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#1B2522]">{formatGoalValue(goal.actual, goal.unit)}<span className="ml-1 text-sm font-bold text-[#85918B]">/ {formatGoalValue(goal.target, goal.unit)}</span></p></div></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className="h-full rounded-full bg-[#10A97A] transition-[width]" style={{ width: `${progress}%` }} /></div><div className="mt-2 flex items-center justify-between gap-2"><p className="text-[11px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, goal.unit)}</p><span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#A0ACA5]" title="Arraste para reorganizar"><GripVertical size={14} />Mover</span></div>{index < goals.length - 1 && <span className="instrument-divider" />}</div>;
+            const displayGoal = goalValuesForMonth(goal, selectedMonth);
+            const progress = progressOf(displayGoal);
+            const remaining = Math.max(displayGoal.target - displayGoal.actual, 0);
+            return <div key={goal.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", goal.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const fromId = event.dataTransfer.getData("text/plain"); if (fromId) onReorderGoals(fromId, goal.id); }} className="instrument-cell group cursor-grab active:cursor-grabbing"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 flex-wrap items-center gap-2"><span className="pulse-dot" /><span className="rounded-full bg-[#F0F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#63736B]">{goal.cadence}</span>{goal.recurring && <span className="rounded-full bg-[#E7F5EF] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#087E5E]">Recorrente</span>}<span className="text-xs text-[#88938E]">{goal.recurring ? periodValueForDate(goal.cadence) : cleanGoalPeriod(goal.period)}</span></div><div className="flex items-center gap-1"><span className="text-xs font-extrabold text-[#087E5A]">{progress}%</span><button type="button" onClick={() => onEditGoal(goal)} className="icon-button h-7 w-7 opacity-70 transition hover:opacity-100" aria-label={`Editar ${goal.title}`}><Pencil size={13} /></button><button type="button" onClick={() => onDeleteGoal(goal.id)} className="icon-button h-7 w-7 text-[#B04D45] opacity-70 transition hover:opacity-100" aria-label={`Excluir ${goal.title}`}><Trash2 size={13} /></button></div></div><div className="mt-3 flex items-center gap-3"><div className="goal-meter shrink-0" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div className="min-w-0 flex-1"><p className="truncate text-base font-bold tracking-[-0.02em] text-[#27302D]">{goal.title}</p><p className="mt-0.5 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#1B2522]">{formatGoalValue(displayGoal.actual, displayGoal.unit)}<span className="ml-1 text-sm font-bold text-[#85918B]">/ {formatGoalValue(displayGoal.target, displayGoal.unit)}</span></p></div></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className="h-full rounded-full bg-[#10A97A] transition-[width]" style={{ width: `${progress}%` }} /></div><div className="mt-2 flex items-center justify-between gap-2"><p className="text-[11px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, displayGoal.unit)}</p><span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#A0ACA5]" title="Arraste para reorganizar"><GripVertical size={14} />Mover</span></div>{index < goals.length - 1 && <span className="instrument-divider" />}</div>;
           })}
           {goals.length === 0 && <button onClick={onNewGoal} className="flex items-center gap-2 text-sm font-bold text-[#087E5A]"><CirclePlus size={18} />Criar primeiro instrumento</button>}
           <div className="instrument-cell relative isolate overflow-hidden border-[#E5BE6B] bg-[#FFF4D9] shadow-[0_10px_24px_rgba(196,141,35,0.12)]"><div className="pointer-events-none absolute inset-0 -z-10 p-5 opacity-45"><div className="grid grid-cols-7 gap-x-3 gap-y-2 text-center text-[12px] font-bold text-[#C99D4B]">{["S", "T", "Q", "Q", "S", "S", "D"].map((day, index) => <span key={`weekday-${index}`} className="text-[9px] uppercase tracking-[0.12em] text-[#B78B38]">{day}</span>)}{calendarDays.map((day, index) => <span key={`day-${index}`} className={`rounded-md py-1 ${day === new Date().getDate() && selectedMonth === new Date().toISOString().slice(0, 7) ? "bg-[#E5BE6B] text-[#6B4D12]" : ""}`}>{day ?? ""}</span>)}</div></div><div className="relative"><div className="flex items-center gap-2"><span className="pulse-dot bg-[#C88920]" /><span className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#8A651D]">Fechamento do mês</span></div><p className="mt-4 font-display text-[38px] font-extrabold tracking-[-0.07em] text-[#6B4D12]">{daysRemaining} {daysRemaining === 1 ? "dia útil" : "dias úteis"}</p><p className="mt-2 text-[14px] font-semibold capitalize text-[#8A6D2A]">restantes em {currentMonth}</p></div></div>
