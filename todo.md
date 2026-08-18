@@ -299,3 +299,5 @@
 - [x] Adicionar botão Salvar explícito para Empresas se o fluxo atual não confirmar a gravação
 - [x] Mover mês/período e tags para os cards superiores de Metas
 - [x] Remover a área inferior redundante de metas sem perder o arrastar e soltar
+- [x] Mover a indicação automática de funil e etapa para o topo dos cards de Metas
+- [x] Remover a repetição de Prospecção na linha inferior dos cards de Metas
