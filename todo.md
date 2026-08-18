@@ -288,3 +288,6 @@
 - [x] Inserir novas metas automaticamente no primeiro card, preservando a ordem manual
 
 - [x] Exibir todas as metas cadastradas no topo da aba Metas, sem limitar aos três primeiros cards
+- [x] Levar círculo e barra de evolução para os cards superiores de metas
+- [x] Remover edição, exclusão e setas dos cards inferiores, mantendo essas ações somente no topo
+- [x] Manter a reorganização das metas exclusivamente por arrastar e soltar
