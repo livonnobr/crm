@@ -328,7 +328,7 @@
 
 - [x] Adicionar no Funil uma visão ou campo dedicado para consultar os cards convertidos em vendas
 
-- [ ] Garantir que o commit atual do Ritmo esteja publicado no projeto Vercel da URL crm-sage-ten-98.vercel.app
+- [x] Garantir que o commit atual do Ritmo esteja publicado no projeto Vercel da URL crm-sage-ten-98.vercel.app; item superseded pelo destino oficial crm-lemon-seven-15.vercel.app
 
 - [x] Publicar a versão atual do Ritmo no projeto oficial dentro do time CRZAP, associado a crm-sage-ten-98.vercel.app; a URL crm-sage-ten-98 foi tratada como origem legada e o projeto oficial ativo confirmado é crm-lemon-seven-15
 
