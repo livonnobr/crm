@@ -283,3 +283,6 @@
 - [x] Validar layout, testes, build e publicação após simplificar o simulador.
 
 - [x] Sincronizar a versão atual com GitHub na branch ritmo-crm e confirmar deploy de produção no projeto /crm da Vercel
+
+- [x] Restaurar edição e exclusão nos cards superiores de metas
+- [x] Inserir novas metas automaticamente no primeiro card, preservando a ordem manual
