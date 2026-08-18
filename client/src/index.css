@@ -139,11 +139,13 @@
   .goal-meter-compact span { font-size: 9px; }
   .calendar-compact-card { min-width: 0; align-self: start; border: 1px solid #E7D9B5; border-radius: 16px; background: #FFFDF7; padding: .85rem; box-shadow: 0 5px 16px rgba(142,105,31,.06); }
   .calendar-compact-card > div:last-child { border-color: #EFE2C2; background: #FFFBF1; }
-  .goals-cadence-surface { min-width: 0; }
+  .goals-cadence-surface { min-width: 0; border: 1px solid #D7E7DC; border-radius: 22px; background: linear-gradient(135deg, #F8FCF9 0%, #F0F8F3 58%, #FFFDF6 100%); padding: .9rem; box-shadow: 0 14px 34px rgba(35,54,43,.07); }
   .planos-cadence { border: 0 !important; border-radius: 0 !important; background: transparent !important; }
-  .planos-cadence > .cadence-inner { padding-inline: 0; padding-top: .25rem; padding-bottom: 0; }
-  .planos-cadence h1 { font-size: 1.05rem; letter-spacing: -.045em; }
-  .cadence-board { border-radius: 16px !important; box-shadow: none !important; }
+  .planos-cadence > .cadence-inner { padding-inline: 0; padding-top: .1rem; padding-bottom: 0; }
+  .planos-cadence .cadence-inner > .mb-4 { margin-bottom: .8rem !important; padding-inline: .2rem; }
+  .planos-cadence h1 { display: flex; align-items: center; gap: .55rem; font-size: 1.15rem; letter-spacing: -.045em; }
+  .planos-cadence h1::before { content: ""; width: .65rem; height: .65rem; flex: 0 0 auto; border-radius: 999px; background: #10A97A; box-shadow: 0 0 0 5px rgba(16,169,122,.12); }
+  .cadence-board { border: 1px solid #D3E2D8 !important; border-radius: 18px !important; box-shadow: 0 10px 24px rgba(35,54,43,.07) !important; }
   .cadence-header { background: #EDF4EE !important; color: #315C4D !important; }
   .cadence-header > div { border-color: #D7E4D9 !important; }
   .cadence-header > div:first-child, .cadence-header > div > div { color: #557267 !important; }
