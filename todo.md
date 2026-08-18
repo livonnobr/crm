@@ -319,4 +319,4 @@
 
 - [x] Permitir personalizar uma meta recorrente apenas no mês selecionado, preservando a regra recorrente nos demais meses e persistindo a exceção
 
-- [ ] Antes de continuar o Financeiro, sincronizar todas as modificações locais pendentes com GitHub e Vercel e confirmar o deploy de produção
+- [x] Antes de continuar o Financeiro, sincronizar todas as modificações locais pendentes com GitHub e Vercel e confirmar o deploy de produção
