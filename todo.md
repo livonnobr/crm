@@ -240,3 +240,6 @@
 
 - [x] Corrigir o simulador para aplicar cada taxa sobre a etapa imediatamente anterior.
 - [x] Atualizar textos e validar projeções, testes, build e publicação da correção.
+
+- [x] Corrigir a navegação da aba Pessoas, que atualmente abre Empresas.
+- [x] Validar o destino correto, testes, build e publicação da correção de navegação.

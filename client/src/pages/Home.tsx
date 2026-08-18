@@ -59,7 +59,7 @@ import { getSupabaseClient, isSupabaseConfigured, supabase } from "@/lib/supabas
 import { summarizeFinanceEntries } from "@/lib/finance";
 import { cleanGoalPeriod, goalPeriodInputType, goalPeriodInputValue, goalPeriodValue as goalPeriodValueFromHelper, periodValueForDate } from "@/lib/goal-period";
 
-type Page = "goals" | "pipeline" | "activities" | "prospecting" | "cadence" | "finance";
+type Page = "goals" | "pipeline" | "activities" | "people" | "prospecting" | "cadence" | "finance";
 
 type FinanceEntry = {
   id: string;
@@ -841,7 +841,7 @@ export default function Home() {
     setPage(nextPage);
     const url = new URL(window.location.href);
     if (nextPage === "goals") url.searchParams.delete("aba");
-    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : nextPage === "cadence" ? "cadencia" : nextPage === "finance" ? "financeiro" : "prospeccao");
+    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : nextPage === "people" ? "pessoas" : nextPage === "cadence" ? "cadencia" : nextPage === "finance" ? "financeiro" : "prospeccao");
     window.history.replaceState({}, "", url);
   }
 
@@ -1364,7 +1364,7 @@ export default function Home() {
           <SidebarMenu>
             <SidebarItem icon={<Target size={19} />} label="Metas" active={page === "goals"} onClick={() => selectPage("goals")} />
             <SidebarItem icon={<GitBranch size={19} />} label="Funil de vendas" active={page === "pipeline"} onClick={() => selectPage("pipeline")} />
-            <SidebarItem icon={<Users size={19} />} label="Pessoas" onClick={() => setPage("prospecting")} />
+            <SidebarItem icon={<Users size={19} />} label="Pessoas" active={page === "people"} onClick={() => selectPage("people")} />
             <SidebarItem icon={<Calendar size={19} />} label="Atividades" active={page === "activities"} onClick={() => selectPage("activities")} />
             <SidebarItem icon={<ClipboardList size={19} />} label="Empresas" active={page === "prospecting"} onClick={() => selectPage("prospecting")} />
             <SidebarItem icon={<GitBranch size={19} />} label="Cadência" active={page === "cadence"} onClick={() => selectPage("cadence")} />
@@ -1414,7 +1414,7 @@ export default function Home() {
           <img className="h-8 w-8 rounded-lg" src={logoUrl} alt="" />
           <span className="font-display text-lg font-extrabold tracking-[-0.06em]">ritmo</span>
         </div>
-        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" ? addProspect : page === "cadence" ? () => addCadenceBlock(1, "morning") : page === "finance" ? addFinanceEntry : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
+        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" || page === "people" ? addProspect : page === "cadence" ? () => addCadenceBlock(1, "morning") : page === "finance" ? addFinanceEntry : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
           <Plus className="h-5 w-5" />
         </button>
       </div>
@@ -1466,6 +1466,8 @@ export default function Home() {
           />
         ) : page === "activities" ? (
           <ActivitiesWorkspace deals={openDeals} onToggleActivity={toggleWorkspaceActivity} onOpenDeal={openDealDetail} onNewDeal={openNewDeal} />
+        ) : page === "people" ? (
+          <PeopleWorkspace lists={prospectLists.filter((list) => !list.deletedAt)} />
         ) : page === "cadence" ? (
           <CadenceWorkspace blocks={cadenceBlocks} onAdd={addCadenceBlock} onMove={moveCadenceBlock} onEdit={editCadenceBlock} onDelete={deleteCadenceBlock} />
         ) : page === "finance" ? (
@@ -1749,6 +1751,11 @@ function GoalRow({ goal, funnels, onEdit, onDelete, position, total, onReorder, 
   const progress = progressOf(goal);
   const styles = { emerald: "bg-[#10A97A]", blue: "bg-[#4386B6]", amber: "bg-[#D8952E]", violet: "bg-[#9075B5]" };
   return <div draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", goal.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const fromId = event.dataTransfer.getData("text/plain"); if (fromId) onReorder(fromId, goal.id); }} className="group relative grid gap-4 rounded-2xl border border-[#E7EBE6] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8D0] hover:shadow-[0_12px_28px_rgba(30,55,44,0.05)] sm:grid-cols-[auto_minmax(190px,1fr)_minmax(175px,0.6fr)_auto] sm:items-center"><div className="goal-meter" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div><div className="mb-1 flex flex-wrap items-center gap-2"><span className="tag-chip">{goal.type}</span><span className="rounded-full bg-[#F0F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#63736B]">{goal.cadence}</span>{goal.recurring && <span className="rounded-full bg-[#E7F5EF] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#087E5A]">Recorrente</span>}<span className="text-xs text-[#88938E]">{goal.recurring ? periodValueForDate(goal.cadence) : cleanGoalPeriod(goal.period)}</span></div><h3 className="font-display text-base font-bold tracking-[-0.025em] text-[#27302D]">{goal.title}</h3>{goal.linkedStageId && <p className="mt-1 text-[11px] font-semibold text-[#087E5A]">Automática · {funnels.flatMap((funnel) => funnel.stages.map((stage) => funnel.name + " · " + stage.name)).find((label) => label.endsWith(" · " + funnels.flatMap((funnel) => funnel.stages).find((stage) => stage.id === goal.linkedStageId)?.name)) ?? "Etapa do funil"}</p>}</div><div><div className="mb-2 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#35403B]">{formatGoalValue(goal.actual, goal.unit)}</span><span className="text-xs font-medium text-[#7D8983]">de {formatGoalValue(goal.target, goal.unit)}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className={`h-full rounded-full ${styles[goal.color]}`} style={{ width: `${progress}%` }} /></div></div><div className="flex items-center justify-end gap-1"><span className="mr-auto cursor-grab text-xs font-bold uppercase tracking-[0.1em] text-[#A0ACA5]" title="Arraste para reorganizar">Mover</span><button onClick={() => onMove("up")} disabled={position === 0} className="icon-button disabled:cursor-not-allowed disabled:opacity-30" aria-label="Mover meta para cima">↑</button><button onClick={() => onMove("down")} disabled={position === total - 1} className="icon-button disabled:cursor-not-allowed disabled:opacity-30" aria-label="Mover meta para baixo">↓</button><button onClick={onEdit} className="icon-button" aria-label={`Editar ${goal.title}`}><Pencil size={15} /></button><button onClick={onDelete} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${goal.title}`}><Trash2 size={15} /></button></div></div>;
+}
+
+function PeopleWorkspace({ lists }: { lists: ProspectList[] }) {
+  const people = lists.flatMap((list) => list.records.map((record) => ({ ...record, listName: list.name })));
+  return <div className="pt-[68px] md:pt-0"><header className="flex min-h-[116px] items-center justify-between px-5 py-6 md:px-10"><div><p className="eyebrow">Relacionamentos comerciais</p><h1 className="page-title">Pessoas <span className="text-[#10A97A]">em contato</span></h1></div><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-extrabold text-[#087E5E]">{people.length} {people.length === 1 ? "pessoa" : "pessoas"}</span></header><div className="px-5 pb-12 md:px-10"><section className="surface-panel overflow-hidden p-4 sm:p-6"><div className="mb-5"><p className="eyebrow">Base de pessoas</p><h2 className="section-title">Decisores das suas empresas</h2><p className="mt-1 text-sm text-[#718078]">Uma visão dedicada aos contatos, separada da aba Empresas.</p></div>{people.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{people.map((person) => <article key={person.id} className="rounded-2xl border border-[#E2E9E2] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#BFD6C8] hover:shadow-[0_10px_24px_rgba(30,55,44,0.06)]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate font-display text-lg font-extrabold tracking-[-0.03em] text-[#27302D]">{`${person.decisionMakerFirstName} ${person.decisionMakerLastName}`.trim() || "Pessoa sem nome"}</h3><p className="mt-1 truncate text-xs font-bold text-[#087E5A]">{person.decisionMakerRole || "Cargo não informado"}</p></div><span className="h-2 w-2 shrink-0 rounded-full bg-[#10A97A]" /></div><div className="mt-4 space-y-2 text-sm text-[#5E7067]"><p className="truncate"><strong className="text-[#27302D]">Empresa:</strong> {person.company || "Não informada"}</p><p className="truncate"><strong className="text-[#27302D]">E-mail:</strong> {person.decisionMakerEmail || "Não informado"}</p><p><strong className="text-[#27302D]">Telefone:</strong> {person.decisionMakerPhone || "Não informado"}</p></div><p className="mt-4 border-t border-[#E8EDE8] pt-3 text-[11px] font-bold uppercase tracking-[0.1em] text-[#8A9690]">Lista · {person.listName}</p></article>)}</div> : <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-[#D6DED8] bg-[#FAFBF9] p-6 text-center"><Users className="mb-2 h-6 w-6 text-[#10A97A]" /><p className="font-bold text-[#27302D]">Ainda não há pessoas cadastradas</p><p className="mt-1 text-sm text-[#718078]">Adicione contatos na aba Empresas para vê-los aqui.</p></div>}</section></div></div>;
 }
 
 function ProspectingMetric({ label, value, detail, accent = false }: { label: string; value: string; detail: string; accent?: boolean }) {
