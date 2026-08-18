@@ -282,4 +282,4 @@
 - [x] Remover do simulador o texto introdutório, o título Taxas de conversão, a legenda e Usar taxas do funil.
 - [x] Validar layout, testes, build e publicação após simplificar o simulador.
 
-- [ ] Sincronizar a versão atual com GitHub na branch ritmo-crm e confirmar deploy de produção no projeto /crm da Vercel
+- [x] Sincronizar a versão atual com GitHub na branch ritmo-crm e confirmar deploy de produção no projeto /crm da Vercel
