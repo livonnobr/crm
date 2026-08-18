@@ -2186,9 +2186,8 @@ function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks:
 
   return <section className="mt-5 overflow-hidden rounded-2xl border border-[#E0E5DF] bg-[#FBFBF9] shadow-[0_14px_36px_rgba(27,37,34,0.05)]">
     <div className="mx-auto max-w-[1500px] px-4 pb-4 pt-4 md:px-5 md:pb-5">
-      <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
-        <div><p className="eyebrow">Operação comercial</p><h1 className="font-display text-3xl font-extrabold tracking-[-0.06em] text-[#1B2522]">Cadência de prospecção</h1><p className="mt-1 max-w-xl text-sm font-medium text-[#77827C]">Desenhe a sequência de contatos por dia e turno. Arraste os blocos para reorganizar o ritmo.</p></div>
-        <div className="flex items-center gap-2"><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-bold text-[#087E5A]">{blocks.length} {blocks.length === 1 ? "ação" : "ações"} planejadas</span></div>
+      <div className="mb-4">
+        <h1 className="font-display text-3xl font-extrabold tracking-[-0.06em] text-[#1B2522]">Cadência de prospecção</h1>
       </div>
       <div className="overflow-hidden rounded-[24px] border border-[#E0E5DF] bg-[#FBFBF9] shadow-[0_18px_50px_rgba(27,37,34,0.06)]">
         <div className="overflow-x-auto">
