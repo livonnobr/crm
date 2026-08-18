@@ -86,6 +86,7 @@ type ProspectRecord = {
   decisionMakerRole: string;
   decisionMakerEmail: string;
   decisionMakerPhone: string;
+  decisionMakerSecondaryPhone: string;
   company: string;
   companyWebsite: string;
   analysis: string;
@@ -212,7 +213,7 @@ type GoalRecord = {
 
 type ConversionSettingsRecord = { workspace_id: string; rates: ConversionRates };
 type ProspectListRow = { id: string; workspace_id: string; name: string; deleted_at: string | null };
-type ProspectRecordRow = { id: string; list_id: string; decision_maker_first_name: string; decision_maker_last_name: string; decision_maker_role: string | null; decision_maker_email: string; decision_maker_phone: string; company: string; company_website: string; analysis: string; position: number };
+type ProspectRecordRow = { id: string; list_id: string; decision_maker_first_name: string; decision_maker_last_name: string; decision_maker_role: string | null; decision_maker_email: string; decision_maker_phone: string; decision_maker_secondary_phone?: string | null; company: string; company_website: string; analysis: string; position: number };
 type FunnelRecord = { id: string; name: string; currency: string; position: number };
 type StageRecord = { id: string; funnel_id: string; name: string; color: string; probability: number; position: number };
 type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null;   notes?: DealNote[] | null; stage_history?: string[] | null };
@@ -384,6 +385,7 @@ const blankProspect: ProspectRecord = {
   decisionMakerRole: "",
   decisionMakerEmail: "",
   decisionMakerPhone: "",
+  decisionMakerSecondaryPhone: "",
   company: "",
   companyWebsite: "",
   analysis: "",
@@ -566,7 +568,7 @@ export default function Home() {
       client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
       client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
       client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
-      client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_email, decision_maker_phone, company, company_website, analysis, position").order("position"),
+      client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_role, decision_maker_email, decision_maker_phone, decision_maker_secondary_phone, company, company_website, analysis, position").order("position"),
       client.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
       client.from("finance_entries").select("id, workspace_id, expense, amount, installment, due_date, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
     ]);
@@ -597,7 +599,7 @@ export default function Home() {
     const prospectRecordsByList = new Map<string, ProspectRecord[]>();
     ((prospectRecordRows ?? []) as ProspectRecordRow[]).forEach((record) => {
       const current = prospectRecordsByList.get(record.list_id) ?? [];
-      current.push({ id: record.id, decisionMakerFirstName: record.decision_maker_first_name, decisionMakerLastName: record.decision_maker_last_name, decisionMakerRole: record.decision_maker_role ?? "", decisionMakerEmail: record.decision_maker_email, decisionMakerPhone: record.decision_maker_phone, company: record.company, companyWebsite: record.company_website, analysis: record.analysis });
+      current.push({ id: record.id, decisionMakerFirstName: record.decision_maker_first_name, decisionMakerLastName: record.decision_maker_last_name, decisionMakerRole: record.decision_maker_role ?? "", decisionMakerEmail: record.decision_maker_email, decisionMakerPhone: record.decision_maker_phone, decisionMakerSecondaryPhone: record.decision_maker_secondary_phone ?? "", company: record.company, companyWebsite: record.company_website, analysis: record.analysis });
       prospectRecordsByList.set(record.list_id, current);
     });
     const cloudProspectLists = ((prospectListRows ?? []) as ProspectListRow[]).map((list) => ({ id: list.id, name: list.name, records: prospectRecordsByList.get(list.id) ?? [], deletedAt: list.deleted_at ?? undefined }));
@@ -767,7 +769,7 @@ export default function Home() {
       if (desiredProspectLists.length) {
         await client.from("prospect_lists").upsert(desiredProspectLists.map((list) => ({ id: list.id, workspace_id: workspaceId, name: list.name, deleted_at: "deletedAt" in list ? list.deletedAt : null, updated_at: new Date().toISOString() })));
       }
-      const prospectRecordRows = desiredProspectLists.flatMap((list) => list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_role: record.decisionMakerRole, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
+      const prospectRecordRows = desiredProspectLists.flatMap((list) => list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_role: record.decisionMakerRole, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, decision_maker_secondary_phone: record.decisionMakerSecondaryPhone, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
       for (const list of desiredProspectLists) {
         const { data: existingRecords } = await client.from("prospect_records").select("id").eq("list_id", list.id);
         const desiredRecordIds = list.records.map((record) => record.id);
@@ -1675,7 +1677,8 @@ const PROSPECT_EXPORT_COLUMNS: Array<{ key: keyof Omit<ProspectRecord, "id">; la
   { key: "decisionMakerLastName", label: "Sobrenome do decisor" },
   { key: "decisionMakerRole", label: "Cargo" },
   { key: "decisionMakerEmail", label: "E-mail do decisor" },
-  { key: "decisionMakerPhone", label: "Telefone do decisor" },
+  { key: "decisionMakerPhone", label: "Telefone principal" },
+  { key: "decisionMakerSecondaryPhone", label: "Telefone secundário" },
   { key: "company", label: "Empresa" },
   { key: "companyWebsite", label: "Site da empresa" },
   { key: "analysis", label: "Análise" },
@@ -1701,6 +1704,10 @@ function exportProspects(activeListName: string, prospects: ProspectRecord[], fo
   window.setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
 }
 
+function adaptiveFieldWidth(value: string, minimum: number) {
+  return `${Math.min(Math.max(value.length + 2, minimum), 42)}ch`;
+}
+
 function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void }) {
   const [trashOpen, setTrashOpen] = useState(false);
   const [pendingProspectDeleteId, setPendingProspectDeleteId] = useState<string | null>(null);
@@ -1709,7 +1716,8 @@ function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListNam
     { key: "decisionMakerLastName", label: "Sobrenome do decisor", width: "min-w-[190px]" },
     { key: "decisionMakerRole", label: "Cargo", width: "min-w-[170px]" },
     { key: "decisionMakerEmail", label: "E-mail do decisor", width: "min-w-[300px]" },
-    { key: "decisionMakerPhone", label: "Telefone do decisor", width: "min-w-[180px]" },
+    { key: "decisionMakerPhone", label: "Telefone principal", width: "min-w-[190px]" },
+    { key: "decisionMakerSecondaryPhone", label: "Telefone secundário", width: "min-w-[190px]" },
     { key: "company", label: "Empresa", width: "min-w-[190px]" },
     { key: "companyWebsite", label: "Site da empresa", width: "min-w-[230px]" },
     { key: "analysis", label: "Análise", width: "min-w-[340px]", multiline: true },
@@ -1733,7 +1741,7 @@ function ProspectingWorkspace({ lists, trashedLists, activeListId, activeListNam
           <table className="w-full min-w-[1500px] border-collapse text-left">
             <thead><tr className="border-b border-[#DDE5DE] bg-[#F4F7F3]">{columns.map((column) => <th key={column.key} className={`${column.width} px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#75837C]`}>{column.label}</th>)}<th className="w-14 px-3 py-3" aria-label="Ações" /></tr></thead>
             <tbody>{prospects.map((prospect, index) => <tr key={prospect.id} className="group border-b border-[#E8EDE8] align-top transition hover:bg-[#FBFDFB]">
-              {columns.map((column) => <td key={column.key} className="px-2 py-2"><label className="sr-only">{column.label} — linha {index + 1}</label>{column.multiline ? <textarea value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} onKeyDown={(event) => { if (event.ctrlKey && event.key === "Enter") { event.preventDefault(); const target = event.currentTarget; const start = target.selectionStart; const end = target.selectionEnd; const nextValue = `${target.value.slice(0, start)}\n\n${target.value.slice(end)}`; onUpdate(prospect.id, column.key, nextValue); requestAnimationFrame(() => target.setSelectionRange(start + 2, start + 2)); } }} placeholder="Escreva sua hipótese, contexto e próximo passo…" className="min-h-[180px] w-full resize-y rounded-lg border border-transparent bg-transparent px-2 py-2 text-sm leading-5 text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" /> : <input value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} placeholder="Preencher" type={column.key === "decisionMakerEmail" ? "email" : "text"} className="h-10 w-full rounded-lg border border-transparent bg-transparent px-2 text-sm text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" />}</td>)}
+              {columns.map((column) => <td key={column.key} className="px-2 py-2"><label className="sr-only">{column.label} — linha {index + 1}</label>{column.multiline ? <textarea value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} onKeyDown={(event) => { if (event.ctrlKey && event.key === "Enter") { event.preventDefault(); const target = event.currentTarget; const start = target.selectionStart; const end = target.selectionEnd; const nextValue = `${target.value.slice(0, start)}\n\n${target.value.slice(end)}`; onUpdate(prospect.id, column.key, nextValue); requestAnimationFrame(() => target.setSelectionRange(start + 2, start + 2)); } }} placeholder="Escreva sua hipótese, contexto e próximo passo…" style={{ width: adaptiveFieldWidth(prospect[column.key], 34) }} className="min-h-[180px] max-w-[60ch] resize-y rounded-lg border border-transparent bg-transparent px-2 py-2 text-sm leading-5 text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" /> : <input value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} placeholder="Preencher" type={column.key === "decisionMakerEmail" ? "email" : "text"} style={{ width: adaptiveFieldWidth(prospect[column.key], column.key === "decisionMakerEmail" ? 30 : 18) }} className="h-10 max-w-[42ch] rounded-lg border border-transparent bg-transparent px-2 text-sm text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" />}</td>)}
               <td className="px-2 py-2"><button type="button" onClick={() => setPendingProspectDeleteId(prospect.id)} className="mt-1 grid h-9 w-9 place-items-center rounded-lg text-[#A0AAA4] opacity-60 transition hover:bg-[#FCEDEB] hover:text-[#B94D45] group-hover:opacity-100" aria-label={`Excluir linha ${index + 1}`}><Trash2 size={16} /></button></td>
             </tr>)}</tbody>
           </table>

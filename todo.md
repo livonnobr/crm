@@ -214,3 +214,7 @@
 
 - [x] Substituir a confirmação nativa `window.confirm` da exclusão de linhas em Empresas por diálogo visual não bloqueante.
 - [ ] Validar a publicação da confirmação visual de exclusão em Empresas no Netlify (deploy recusado por limite de créditos; GitHub sincronizado e build local validado).
+
+- [x] Adicionar telefone secundário à grade, modelo, persistência e exportação de Empresas.
+- [x] Adaptar largura e edição dos campos da grade ao conteúdo digitado sem truncamento visual.
+- [x] Validar testes, build, sincronização GitHub e publicação Netlify da melhoria de Empresas.
