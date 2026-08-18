@@ -377,3 +377,8 @@
 - [ ] Corrigir leitura e gravação autenticadas de Funis, Negócios, Empresas e Metas no workspace do usuário Supabase
 - [ ] Validar diretamente no crmsupa que os quatro módulos carregam e persistem registros reais após o login
 - [x] Impedir que um snapshot Supabase vazio substitua os dados locais antes da primeira sincronização autenticada
+
+- [x] Restaurar o botão Salvar em cada linha da aba Empresas com retorno visual por registro
+- [x] Corrigir o estado “Sincronização pendente” para refletir somente uma gravação realmente não confirmada pelo Supabase
+- [ ] Confirmar em produção que Funis, Negócios, Empresas e Metas persistem no crmsupa após login próprio
+- [x] Fazer o botão Salvar da linha confirmar a escrita pelo backend autenticado e atualizar o estado visual de Empresas somente após sucesso do Supabase

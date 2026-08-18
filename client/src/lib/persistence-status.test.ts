@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import { persistenceActionLabel, persistenceLabel, persistenceStatus } from "./persistence-status";
 
 describe("persistence status", () => {
-  it("treats a workspace id as cloud-synced", () => {
-    expect(persistenceStatus("workspace-123")).toBe("cloud");
-    expect(persistenceLabel("workspace-123")).toBe("Sincronizado automaticamente");
-    expect(persistenceActionLabel("workspace-123")).toBe("Sincronização automática");
+  it("treats an explicit successful confirmation as cloud-synced", () => {
+    expect(persistenceStatus(true)).toBe("cloud");
+    expect(persistenceLabel(true)).toBe("Sincronizado automaticamente");
+    expect(persistenceActionLabel(true)).toBe("Sincronização automática");
   });
 
-  it("treats a missing workspace as local-only", () => {
-    expect(persistenceStatus(null)).toBe("local");
-    expect(persistenceLabel(null)).toBe("Sincronização pendente");
-    expect(persistenceActionLabel(null)).toBe("Sincronização automática");
+  it("keeps the status pending until a successful write is confirmed", () => {
+    expect(persistenceStatus(false)).toBe("local");
+    expect(persistenceLabel(false)).toBe("Sincronização pendente");
+    expect(persistenceActionLabel(false)).toBe("Sincronização automática");
   });
 });

@@ -4,7 +4,7 @@
  * O layout usa um trilho operacional lateral e uma bancada horizontal de oportunidades.
  */
 import { RitmoAuthScreen } from "@/components/RitmoAuthScreen";
-import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from "react";
 import {
   Activity,
   ArrowRight,
@@ -65,7 +65,7 @@ import { getSupabaseClient, isSupabaseConfigured, supabase } from "@/lib/supabas
 import { summarizeFinanceEntries } from "@/lib/finance";
 import { cleanGoalPeriod, goalPeriodInputType, goalPeriodInputValue, goalPeriodValue as goalPeriodValueFromHelper, periodValueForDate } from "@/lib/goal-period";
 import { businessDaysUntilMonthEnd } from "@/lib/business-days";
-import { persistenceActionLabel, persistenceLabel } from "@/lib/persistence-status";
+import { persistenceLabel } from "@/lib/persistence-status";
 import { projectFunnelStages, reorderFunnelStages } from "@/lib/funnel-utils";
 import { snapshotHasPersistedData } from "@/lib/workspace-hydration";
 import { trpc } from "@/lib/trpc";
@@ -576,6 +576,8 @@ export default function Home() {
   const [activeFunnelId, setActiveFunnelId] = useState(() => storedValue("ritmo-active-funnel", "primary-funnel"));
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [isSyncConfirmed, setIsSyncConfirmed] = useState(false);
+  const syncAttemptRef = useRef(0);
   const [isCloudLoading, setIsCloudLoading] = useState(isSupabaseConfigured);
   const [isCloudHydrating, setIsCloudHydrating] = useState(false);
   const [isProspectSaving, setIsProspectSaving] = useState(false);
@@ -774,9 +776,11 @@ export default function Home() {
     }
   }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, financeEntries, workspaceId]);
 
-  useEffect(() => {
-    if (!workspaceId || isCloudHydrating) return;
-    void syncWorkspaceMutation.mutateAsync({ state: {
+  async function syncCurrentWorkspace() {
+    if (!workspaceId) throw new Error("Workspace Supabase indisponível.");
+    const attempt = ++syncAttemptRef.current;
+    setIsSyncConfirmed(false);
+    await syncWorkspaceMutation.mutateAsync({ state: {
       goals: goals.map((goal) => ({ ...goal, period: goalPeriodValue(goal) })),
       funnels,
       deals: deals.map((deal) => ({ ...deal, companyData: { ...(deal.companyData ?? {}), __ritmoStageEvents: stageEventsForDeal(deal) } })),
@@ -785,7 +789,13 @@ export default function Home() {
       trashedProspectLists,
       cadenceBlocks,
       financeEntries,
-    } }).catch(() => toast.error("Não foi possível sincronizar os dados com o Supabase."));
+    } });
+    if (syncAttemptRef.current === attempt) setIsSyncConfirmed(true);
+  }
+
+  useEffect(() => {
+    if (!workspaceId || isCloudHydrating) return;
+    void syncCurrentWorkspace().catch(() => toast.error("Não foi possível sincronizar os dados com o Supabase."));
     return;
   }, [goals, funnels, deals, conversionRates, prospectLists, trashedProspectLists, cadenceBlocks, financeEntries, workspaceId, isCloudHydrating]);
 
@@ -902,8 +912,8 @@ export default function Home() {
   }
 
   async function saveProspectToCloud(id: string) {
-    if (!workspaceId || !supabase) {
-      toast.error("Conecte sua conta para salvar esta Empresa no Supabase.");
+    if (!workspaceId) {
+      toast.error("Aguarde a conexão autenticada do Ritmo antes de salvar esta Empresa.");
       return;
     }
     const list = activeProspectList;
@@ -911,12 +921,8 @@ export default function Home() {
     if (!list || !record) return;
     setSavingProspectId(id);
     try {
-      const client = getSupabaseClient();
-      const { error: listError } = await client.from("prospect_lists").upsert({ id: list.id, workspace_id: workspaceId, name: list.name, deleted_at: null, updated_at: new Date().toISOString() });
-      if (listError) throw listError;
-      const { error: recordError } = await client.from("prospect_records").upsert({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_role: record.decisionMakerRole, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, decision_maker_secondary_phone: record.decisionMakerSecondaryPhone, monthly_visits: record.monthlyVisits, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position: list.records.findIndex((item) => item.id === record.id), updated_at: new Date().toISOString() });
-      if (recordError) throw recordError;
-      toast.success(`Empresa ${record.company.trim() || "sem nome"} salva no Supabase.`);
+      await syncCurrentWorkspace();
+      toast.success(`Empresa ${record.company.trim() || "sem nome"} salva e confirmada no Supabase.`);
     } catch {
       toast.error("Não foi possível salvar esta Empresa no Supabase.");
     } finally {
@@ -925,40 +931,13 @@ export default function Home() {
   }
 
   async function saveProspectsToCloud() {
-    if (!workspaceId || !supabase) {
-      toast.error("Conecte sua conta para salvar Empresas no Supabase.");
+    if (!workspaceId) {
+      toast.error("Aguarde a conexão autenticada do Ritmo antes de salvar Empresas.");
       return;
     }
     setIsProspectSaving(true);
     try {
-      const client = getSupabaseClient();
-      const desiredLists = [...prospectLists, ...trashedProspectLists];
-      const { data: existingLists, error: listsError } = await client.from("prospect_lists").select("id").eq("workspace_id", workspaceId);
-      if (listsError) throw listsError;
-      const desiredListIds = desiredLists.map((list) => list.id);
-      const staleListIds = ((existingLists ?? []) as Array<{ id: string }>).map((list) => list.id).filter((id) => !desiredListIds.includes(id));
-      if (staleListIds.length) {
-        const { error } = await client.from("prospect_lists").delete().in("id", staleListIds);
-        if (error) throw error;
-      }
-      if (desiredLists.length) {
-        const { error } = await client.from("prospect_lists").upsert(desiredLists.map((list) => ({ id: list.id, workspace_id: workspaceId, name: list.name, deleted_at: "deletedAt" in list ? list.deletedAt : null, updated_at: new Date().toISOString() })));
-        if (error) throw error;
-      }
-      for (const list of desiredLists) {
-        const { data: existingRecords, error: recordsError } = await client.from("prospect_records").select("id").eq("list_id", list.id);
-        if (recordsError) throw recordsError;
-        const desiredRecordIds = list.records.map((record) => record.id);
-        const staleRecordIds = ((existingRecords ?? []) as Array<{ id: string }>).map((record) => record.id).filter((id) => !desiredRecordIds.includes(id));
-        if (staleRecordIds.length) {
-          const { error } = await client.from("prospect_records").delete().in("id", staleRecordIds);
-          if (error) throw error;
-        }
-        if (list.records.length) {
-          const { error } = await client.from("prospect_records").upsert(list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_role: record.decisionMakerRole, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, decision_maker_secondary_phone: record.decisionMakerSecondaryPhone, monthly_visits: record.monthlyVisits, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
-          if (error) throw error;
-        }
-      }
+      await syncCurrentWorkspace();
       toast.success("Empresas salvas no Supabase.");
     } catch {
       toast.error("Não foi possível salvar as Empresas no Supabase.");
@@ -1570,7 +1549,7 @@ export default function Home() {
         ) : page === "finance" ? (
           <FinanceWorkspace entries={financeEntries} onAdd={addFinanceEntry} onUpdate={updateFinanceEntry} onDelete={deleteFinanceEntry} />
         ) : (
-          <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} funnels={funnels} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} onImportList={importProspectList} onSave={saveProspectsToCloud} onSaveProspect={saveProspectToCloud} isSaving={isProspectSaving} savingProspectId={savingProspectId} cloudConnected={Boolean(workspaceId)} onConnect={() => setAuthDialogOpen(true)} />
+          <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} funnels={funnels} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} onImportList={importProspectList} onSave={saveProspectsToCloud} onSaveProspect={saveProspectToCloud} isSaving={isProspectSaving} savingProspectId={savingProspectId} syncConfirmed={isSyncConfirmed} onConnect={() => setAuthDialogOpen(true)} />
         )}
       </main>
 
@@ -1878,7 +1857,7 @@ function adaptiveFieldWidth(value: string, minimum: number) {
   return `${Math.min(Math.max(value.length + 2, minimum), 42)}ch`;
 }
 
-function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete, onImportList, onSave, onSaveProspect, isSaving, savingProspectId, cloudConnected, onConnect }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; funnels: SalesFunnel[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void; onImportList: (listId: string, funnelId: string, stageId: string) => void; onSave: () => void; onSaveProspect: (id: string) => void; isSaving: boolean; savingProspectId: string | null; cloudConnected: boolean; onConnect: () => void }) {
+function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete, onImportList, onSave, onSaveProspect, isSaving, savingProspectId, syncConfirmed, onConnect }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; funnels: SalesFunnel[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void; onImportList: (listId: string, funnelId: string, stageId: string) => void; onSave: () => void; onSaveProspect: (id: string) => void; isSaving: boolean; savingProspectId: string | null; syncConfirmed: boolean; onConnect: () => void }) {
   const [trashOpen, setTrashOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importFunnelId, setImportFunnelId] = useState(funnels[0]?.id ?? "");
@@ -1906,7 +1885,7 @@ function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, acti
         <div className="flex min-w-0 items-center gap-2 rounded-xl border border-[#DDE5DE] bg-[#FCFCFA] px-2 py-1.5"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={17} /></div><label htmlFor="prospect-list-select" className="sr-only">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="block max-w-[180px] truncate border-0 bg-transparent p-0 pr-7 text-sm font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} className="h-8 w-[160px] rounded-lg border border-[#DDE5DE] bg-white px-2.5 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-8 gap-1 rounded-lg border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={14} />Nova lista</Button><Button variant="outline" onClick={onDeleteList} className="h-8 gap-1 rounded-lg border-[#F0D5D1] px-2.5 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={14} />Excluir</Button><Button variant="outline" onClick={() => setTrashOpen((open) => !open)} className="h-8 gap-1 rounded-lg border-[#DDE5DE] px-2.5 text-xs font-extrabold text-[#63706B] hover:bg-[#F3F5F1]"><Trash2 size={14} />Lixeira{trashedLists.length ? ` (${trashedLists.length})` : ""}</Button></div>
         <div className="flex flex-wrap gap-2"><Button onClick={() => setImportOpen(true)} variant="outline" className="h-9 gap-1.5 rounded-xl border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><ArrowRight size={15} />Adicionar ao funil</Button><Button onClick={onAdd} className="h-9 gap-1.5 rounded-xl bg-[#10A97A] px-3 font-bold hover:bg-[#087E5A]"><Plus size={17} />Nova linha</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "csv")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />CSV</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "xls")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />Excel</Button></div>
       </header>
-      <div className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs ${cloudConnected ? "border-[#CBE5D7] bg-[#F0F8F3] text-[#087E5A]" : "border-[#E7D5A8] bg-[#FFF9E8] text-[#80621D]"}`}><div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${cloudConnected ? "bg-[#10A97A]" : "bg-[#C88920]"}`} /><span>{persistenceLabel(cloudConnected ? "workspace" : null)}</span></div></div>
+      <div className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs ${syncConfirmed ? "border-[#CBE5D7] bg-[#F0F8F3] text-[#087E5A]" : "border-[#E7D5A8] bg-[#FFF9E8] text-[#80621D]"}`}><div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${syncConfirmed ? "bg-[#10A97A]" : "bg-[#C88920]"}`} /><span>{persistenceLabel(syncConfirmed)}</span></div></div>
       {trashOpen && <section className="mt-3 rounded-2xl border border-[#E4DDD5] bg-[#FFFDF9] p-4 shadow-[0_8px_22px_rgba(75,61,43,0.04)]"><div className="flex flex-col gap-2 border-b border-[#EEE6DC] pb-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><p className="text-sm font-extrabold text-[#3B3934]">Lixeira</p><span className="h-1.5 w-1.5 rounded-full bg-[#D8952E]" /></div><p className="mt-1 text-xs text-[#8B8177]">Listas excluídas ficam disponíveis por 30 dias para restauração.</p></div><span className="rounded-full bg-[#FFF2D9] px-3 py-1.5 text-xs font-extrabold text-[#9A6819]">{trashedLists.length} {trashedLists.length === 1 ? "lista" : "listas"}</span></div>{trashedLists.length ? <div className="mt-3 space-y-2">{trashedLists.map((list) => { const daysLeft = Math.max(0, Math.ceil((new Date(list.deletedAt).getTime() + PROSPECT_TRASH_RETENTION_MS - Date.now()) / (24 * 60 * 60 * 1000))); return <div key={list.id} className="flex flex-col gap-3 rounded-xl border border-[#EEE6DC] bg-white p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate text-sm font-bold text-[#3B3934]">{list.name || "Lista sem nome"}</p><p className="mt-1 text-xs text-[#8B8177]">{list.records.length} {list.records.length === 1 ? "registro" : "registros"} · expira em {daysLeft} {daysLeft === 1 ? "dia" : "dias"}</p></div><div className="flex shrink-0 gap-2"><Button variant="outline" onClick={() => onRestoreList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5E] hover:bg-[#E8F6F0]"><RotateCcw size={14} />Restaurar</Button><Button variant="outline" onClick={() => onPermanentDeleteList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#F0D5D1] px-3 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={14} />Excluir definitivamente</Button></div></div>; })}</div> : <p className="mt-4 text-sm text-[#8B8177]">A Lixeira está vazia.</p>}</section>}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="max-w-md rounded-2xl border-[#DDE5DE] bg-[#FFFDF9]">
@@ -1925,9 +1904,10 @@ function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, acti
         <div className="flex flex-col gap-3 border-b border-[#E5EAE5] bg-[#FBFCFA] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><div className="flex items-center gap-2"><p className="text-sm font-extrabold text-[#27302D]">Base de contatos</p><span className="h-1.5 w-1.5 rounded-full bg-[#10A97A]" /></div><p className="mt-1 text-xs text-[#7B8882]">{prospects.length} {prospects.length === 1 ? "registro" : "registros"} · edição direta na bancada</p></div><div className="flex items-center gap-2"><span className="hidden text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#87938D] sm:inline">Tabuleiro operacional</span><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-extrabold text-[#087E5E]">Rascunho comercial</span></div></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1500px] border-collapse text-left">
-            <thead><tr className="border-b border-[#DDE5DE] bg-[#F4F7F3]">{columns.map((column) => <th key={column.key} className={`${column.width} px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#75837C]`}>{column.label}</th>)}<th className="w-16 px-3 py-3" aria-label="Ações" /></tr></thead>
+            <thead><tr className="border-b border-[#DDE5DE] bg-[#F4F7F3]">{columns.map((column) => <th key={column.key} className={`${column.width} px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#75837C]`}>{column.label}</th>)}<th className="w-28 px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#75837C]">Salvar</th><th className="w-16 px-3 py-3" aria-label="Ações" /></tr></thead>
             <tbody>{prospects.map((prospect, index) => <tr key={prospect.id} className="group border-b border-[#E8EDE8] align-top transition hover:bg-[#FBFDFB]">
               {columns.map((column) => <td key={column.key} className="px-2 py-2"><label className="sr-only">{column.label} — linha {index + 1}</label>{column.multiline ? <textarea value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} onKeyDown={(event) => { if (event.ctrlKey && event.key === "Enter") { event.preventDefault(); const target = event.currentTarget; const start = target.selectionStart; const end = target.selectionEnd; const nextValue = `${target.value.slice(0, start)}\n\n${target.value.slice(end)}`; onUpdate(prospect.id, column.key, nextValue); requestAnimationFrame(() => target.setSelectionRange(start + 2, start + 2)); } }} placeholder="Escreva sua hipótese, contexto e próximo passo…" style={{ width: adaptiveFieldWidth(prospect[column.key], 34) }} className="min-h-[180px] max-w-[60ch] resize-y rounded-lg border border-transparent bg-transparent px-2 py-2 text-sm leading-5 text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" /> : <input value={prospect[column.key]} onChange={(event) => onUpdate(prospect.id, column.key, event.target.value)} placeholder="Preencher" type={column.key === "decisionMakerEmail" ? "email" : "text"} style={{ width: adaptiveFieldWidth(prospect[column.key], column.key === "decisionMakerEmail" ? 30 : 18) }} className="h-10 max-w-[42ch] rounded-lg border border-transparent bg-transparent px-2 text-sm text-[#27302D] outline-none transition placeholder:text-[#A2ADA6] hover:border-[#DCE7DF] focus:border-[#10A97A] focus:bg-white" />}</td>)}
+              <td className="px-2 py-2"><Button type="button" variant="outline" onClick={() => onSaveProspect(prospect.id)} disabled={isSaving || savingProspectId === prospect.id} className="mt-1 h-9 gap-1 rounded-lg border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0] disabled:opacity-60">{savingProspectId === prospect.id ? <Circle size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}{savingProspectId === prospect.id ? "Salvando" : "Salvar"}</Button></td>
               <td className="px-2 py-2"><div className="mt-1 flex items-center gap-1.5"><button type="button" onClick={() => setPendingProspectDeleteId(prospect.id)} className="grid h-9 w-9 place-items-center rounded-lg text-[#A0AAA4] opacity-60 transition hover:bg-[#FCEDEB] hover:text-[#B94D45] group-hover:opacity-100" aria-label={`Excluir linha ${index + 1}`}><Trash2 size={16} /></button></div></td>
             </tr>)}</tbody>
           </table>

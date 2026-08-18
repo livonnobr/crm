@@ -31,7 +31,7 @@ export async function ensureWorkspaceForOwner(owner: {
     const created = await supabase.auth.admin.createUser({
       email,
       email_confirm: true,
-      user_metadata: { name: owner.name ?? ENV.ownerOpenId ?? email, source: "ritmo-owner-workspace" },
+      user_metadata: { name: owner.name ?? (ENV.ownerOpenId || email), source: "ritmo-owner-workspace" },
     });
     if (created.error) throw created.error;
     authUser = created.data.user;
