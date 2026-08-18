@@ -297,3 +297,5 @@
 - [x] Configurar favicon da marca Ritmo
 - [x] Auditar se novos cadastros de Empresas são persistidos automaticamente no Supabase
 - [x] Adicionar botão Salvar explícito para Empresas se o fluxo atual não confirmar a gravação
+- [x] Mover mês/período e tags para os cards superiores de Metas
+- [x] Remover a área inferior redundante de metas sem perder o arrastar e soltar

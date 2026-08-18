@@ -1473,14 +1473,12 @@ export default function Home() {
         {page === "goals" ? (
           <GoalsWorkspace
             goals={computedGoals}
-            achievedRevenue={achievedRevenue}
             averageGoalProgress={averageGoalProgress}
             onNewGoal={openNewGoal}
             onOpenPipeline={() => setPage("pipeline")}
             onEditGoal={openEditGoal}
             onDeleteGoal={deleteGoal}
             onReorderGoals={reorderGoals}
-            onMoveGoal={moveGoal}
             funnels={funnels}
             conversionRates={conversionRates}
             onSaveConversionRates={(rates) => { setConversionRates(rates); toast.success("Taxas de conversão salvas."); }}
@@ -1711,7 +1709,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
   );
 }
 
-function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, onMoveGoal, funnels, conversionRates, onSaveConversionRates }: { goals: GoalItem[]; achievedRevenue: number; averageGoalProgress: number; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; onMoveGoal: (id: string, direction: "up" | "down") => void; funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
+function GoalsWorkspace({ goals, averageGoalProgress, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, funnels, conversionRates, onSaveConversionRates }: { goals: GoalItem[]; averageGoalProgress: number; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
   const daysRemaining = daysUntilMonthEnd();
   const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date());
   return (
@@ -1726,7 +1724,7 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
           {goals.map((goal, index) => {
             const progress = progressOf(goal);
             const remaining = Math.max(goal.target - goal.actual, 0);
-            return <div key={goal.id} className="instrument-cell"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="pulse-dot" /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#6F7D76]">{goal.type}</span></div><div className="flex items-center gap-1"><span className="text-xs font-extrabold text-[#087E5A]">{progress}%</span><button type="button" onClick={() => onEditGoal(goal)} className="icon-button h-7 w-7 opacity-70 transition hover:opacity-100" aria-label={`Editar ${goal.title}`}><Pencil size={13} /></button><button type="button" onClick={() => onDeleteGoal(goal.id)} className="icon-button h-7 w-7 text-[#B04D45] opacity-70 transition hover:opacity-100" aria-label={`Excluir ${goal.title}`}><Trash2 size={13} /></button></div></div><div className="mt-3 flex items-center gap-3"><div className="goal-meter shrink-0" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[#6C7A73]">{goal.title}</p><p className="mt-0.5 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#1B2522]">{formatGoalValue(goal.actual, goal.unit)}<span className="ml-1 text-sm font-bold text-[#85918B]">/ {formatGoalValue(goal.target, goal.unit)}</span></p></div></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className="h-full rounded-full bg-[#10A97A] transition-[width]" style={{ width: `${progress}%` }} /></div><p className="mt-2 text-[11px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, goal.unit)}</p>{index < goals.length - 1 && <span className="instrument-divider" />}</div>;
+            return <div key={goal.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", goal.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const fromId = event.dataTransfer.getData("text/plain"); if (fromId) onReorderGoals(fromId, goal.id); }} className="instrument-cell group cursor-grab active:cursor-grabbing"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 flex-wrap items-center gap-2"><span className="pulse-dot" /><span className="tag-chip">{goal.type}</span><span className="rounded-full bg-[#F0F4F0] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#63736B]">{goal.cadence}</span>{goal.recurring && <span className="rounded-full bg-[#E7F5EF] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#087E5E]">Recorrente</span>}<span className="text-xs text-[#88938E]">{goal.recurring ? periodValueForDate(goal.cadence) : cleanGoalPeriod(goal.period)}</span></div><div className="flex items-center gap-1"><span className="text-xs font-extrabold text-[#087E5A]">{progress}%</span><button type="button" onClick={() => onEditGoal(goal)} className="icon-button h-7 w-7 opacity-70 transition hover:opacity-100" aria-label={`Editar ${goal.title}`}><Pencil size={13} /></button><button type="button" onClick={() => onDeleteGoal(goal.id)} className="icon-button h-7 w-7 text-[#B04D45] opacity-70 transition hover:opacity-100" aria-label={`Excluir ${goal.title}`}><Trash2 size={13} /></button></div></div><div className="mt-3 flex items-center gap-3"><div className="goal-meter shrink-0" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><span>{progress}%</span></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[#6C7A73]">{goal.title}</p><p className="mt-0.5 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#1B2522]">{formatGoalValue(goal.actual, goal.unit)}<span className="ml-1 text-sm font-bold text-[#85918B]">/ {formatGoalValue(goal.target, goal.unit)}</span></p></div></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E8ECE7]"><div className="h-full rounded-full bg-[#10A97A] transition-[width]" style={{ width: `${progress}%` }} /></div><div className="mt-2 flex items-center justify-between gap-2"><p className="text-[11px] font-medium text-[#85918B]">Faltam {formatGoalValue(remaining, goal.unit)}</p><span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#A0ACA5]" title="Arraste para reorganizar"><GripVertical size={14} />Mover</span></div>{index < goals.length - 1 && <span className="instrument-divider" />}</div>;
           })}
           {goals.length === 0 && <button onClick={onNewGoal} className="flex items-center gap-2 text-sm font-bold text-[#087E5A]"><CirclePlus size={18} />Criar primeiro instrumento</button>}
           <div className="instrument-cell border-[#E5BE6B] bg-[#FFF4D9] shadow-[0_10px_24px_rgba(196,141,35,0.12)]"><div className="flex items-center gap-2"><span className="pulse-dot bg-[#C88920]" /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8A651D]">Fechamento do mês</span></div><p className="mt-3 font-display text-[24px] font-extrabold tracking-[-0.06em] text-[#6B4D12]">{daysRemaining} {daysRemaining === 1 ? "dia útil" : "dias úteis"}</p><p className="mt-1 text-[11px] font-medium capitalize text-[#8A6D2A]">restantes em {currentMonth} · sábados, domingos e feriados não entram</p></div>
@@ -1741,19 +1739,6 @@ function GoalsWorkspace({ goals, achievedRevenue, averageGoalProgress, onNewGoal
           </div>
         </section>
 
-        <section className="mt-7 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="p-0">
-            <div className="mb-5 flex items-end justify-between gap-3"><div><p className="eyebrow">Acompanhamento</p><h2 className="section-title">O que move sua receita</h2></div><button onClick={onNewGoal} className="hidden items-center gap-1 text-sm font-bold text-[#087E5A] hover:text-[#056448] sm:flex">Adicionar <ChevronRight size={16} /></button></div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {goals.map((goal) => <GoalRow key={goal.id} goal={goal} funnels={funnels} onReorder={onReorderGoals} />)}
-              {goals.length === 0 && <div className="grid min-h-48 place-items-center rounded-2xl border border-dashed border-[#D6DED8] bg-[#FAFBF9] p-6 text-center"><Target className="mb-2 h-6 w-6 text-[#10A97A]" /><div><p className="font-bold">Ainda não há metas</p><p className="mt-1 text-sm text-[#718078]">Crie uma meta de prospecção ou vendas para começar.</p></div></div>}
-            </div>
-          </div>
-          <aside className="relative min-h-[280px] overflow-hidden rounded-3xl border border-[#DCE3DD] bg-[#EDF2EE] p-6">
-            <img src={goalsArtUrl} alt="Instrumento abstrato de medição de metas" className="absolute inset-0 h-full w-full object-cover opacity-70 mix-blend-multiply" />
-            <div className="relative z-10 flex h-full flex-col"><div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#D4DED6] bg-[#F9FAF7]/90 px-3 py-1.5 text-xs font-bold text-[#52635B]"><TrendingUp size={14} className="text-[#10A97A]" />Receita realizada</div><div className="mt-auto"><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#5B7066]">Meta em vendas</p><p className="mt-2 font-display text-[42px] font-extrabold tracking-[-0.07em] text-[#18201E]">{formatCurrency(achievedRevenue)}</p><p className="mt-1 text-sm font-medium text-[#55675F]">soma do realizado neste período</p><button onClick={onNewGoal} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#18201E] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#087E5A]">Definir meta <ArrowUpRight size={15} /></button></div></div>
-          </aside>
-        </section>
       </div>
     </div>
   );
