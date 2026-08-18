@@ -250,3 +250,14 @@
 - [x] Abrir pop-up de criação ao clicar em célula vazia da Cadência, sem criar ação diretamente.
 - [x] Adicionar os canais LinkedIn e Instagram com ícones e persistência compatível.
 - [x] Remover o botão verde Nova ação e validar interação, testes, build e publicação.
+
+- [x] Fixar Vercel como único destino operacional de deploy e retirar Netlify do fluxo.
+- [x] Fixar o projeto Supabase crmsupa como destino autorizado das operações do CRM.
+
+- [ ] Subir as despesas dos CSVs anexados no projeto Supabase crmsupa.
+- [ ] Confirmar o mapeamento, evitar duplicidades e validar os totais no Financeiro após a carga.
+
+- [ ] Auditar divergências entre código local, GitHub `ritmo-crm`, projeto Vercel e banco crmsupa.
+- [ ] Sincronizar a versão validada do CRM no GitHub e Vercel, sem usar Netlify.
+- [ ] Criar ou identificar workspace correto no crmsupa e importar as despesas financeiras sem duplicidade.
+- [ ] Validar o estado final dos três destinos e documentar eventuais bloqueios de autenticação.
