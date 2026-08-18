@@ -171,6 +171,13 @@ type Stage = {
   probability: number;
 };
 
+type GoalSimulationStage = {
+  id: string;
+  name: string;
+  color: string;
+  probability: number;
+};
+
 type SalesFunnel = {
   id: string;
   name: string;
@@ -265,6 +272,7 @@ type GoalRecord = {
 };
 
 type ConversionSettingsRecord = { workspace_id: string; rates: ConversionRates };
+type GoalSimulationStageRecord = { id: string; workspace_id: string; name: string; color: string; probability: number; position: number };
 type ProspectListRow = { id: string; workspace_id: string; name: string; deleted_at: string | null };
 type ProspectRecordRow = { id: string; list_id: string; decision_maker_first_name: string; decision_maker_last_name: string; decision_maker_role: string | null; decision_maker_email: string; decision_maker_phone: string; decision_maker_secondary_phone?: string | null; monthly_visits?: string | null; company: string; company_website: string; analysis: string; position: number };
 type FunnelRecord = { id: string; name: string; currency: string; position: number };
@@ -314,6 +322,13 @@ const initialGoals: GoalItem[] = [
     position: 2,
     color: "amber",
   },
+];
+
+const initialGoalSimulationStages: GoalSimulationStage[] = [
+  { id: "simulation-entry", name: "Entrada", color: "#77918B", probability: 100 },
+  { id: "simulation-diagnosis", name: "Diagnóstico", color: "#5B8CB2", probability: 50 },
+  { id: "simulation-proposal", name: "Proposta", color: "#B07D3A", probability: 35 },
+  { id: "simulation-won", name: "Ganho", color: "#10A97A", probability: 20 },
 ];
 
 const initialFunnels: SalesFunnel[] = [
@@ -590,6 +605,7 @@ export default function Home() {
   const [selectedGoalMonth, setSelectedGoalMonth] = useState(() => periodValueForDate("Mensal"));
   const [funnels, setFunnels] = useState<SalesFunnel[]>(() => storedValue("ritmo-funnels", initialFunnels));
   const [conversionRates, setConversionRates] = useState<ConversionRates>(() => storedValue("ritmo-conversion-rates", {}));
+  const [goalSimulationStages, setGoalSimulationStages] = useState<GoalSimulationStage[]>(() => storedValue("ritmo-goal-simulation-stages", initialGoalSimulationStages));
   const [deals, setDeals] = useState<Deal[]>(() => storedValue<Deal[]>("ritmo-deals", initialDeals).map((deal) => ({ ...deal, stageHistory: deal.stageHistory?.length ? deal.stageHistory : [deal.stageId], stageEvents: stageEventsForDeal(deal) })));
   const [prospectLists, setProspectLists] = useState<ProspectList[]>(() => storedProspectLists());
   const [trashedProspectLists, setTrashedProspectLists] = useState<TrashedProspectList[]>(() => storedTrashedProspectLists());
@@ -636,11 +652,12 @@ export default function Home() {
     setIsCloudLoading(true);
     const client = getSupabaseClient();
     const remoteSnapshot = workspaceSnapshot.data?.snapshot;
-    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }, { data: financeRows, error: financeError }, { data: serviceRows, error: servicesError }] = remoteSnapshot
+    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: goalSimulationStageRows, error: goalSimulationStagesError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }, { data: financeRows, error: financeError }, { data: serviceRows, error: servicesError }] = remoteSnapshot
       ? [
           { data: remoteSnapshot.goals, error: null },
           { data: remoteSnapshot.funnels, error: null },
           { data: remoteSnapshot.conversionSettings, error: null },
+          { data: remoteSnapshot.goalSimulationStages, error: null },
           { data: remoteSnapshot.prospectLists, error: null },
           { data: remoteSnapshot.prospectRecords, error: null },
           { data: remoteSnapshot.cadenceBlocks, error: null },
@@ -651,6 +668,7 @@ export default function Home() {
           client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, position, linked_funnel_id, linked_stage_id").eq("workspace_id", currentWorkspaceId).order("position", { ascending: true }),
           client.from("funnels").select("id, name, currency, position").eq("workspace_id", currentWorkspaceId).order("position"),
           client.from("conversion_settings").select("workspace_id, rates").eq("workspace_id", currentWorkspaceId).maybeSingle(),
+          client.from("goal_simulation_stages").select("id, workspace_id, name, color, probability, position").eq("workspace_id", currentWorkspaceId).order("position"),
           client.from("prospect_lists").select("id, workspace_id, name, deleted_at").eq("workspace_id", currentWorkspaceId).order("created_at"),
           client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_role, decision_maker_email, decision_maker_phone, decision_maker_secondary_phone, monthly_visits, company, company_website, analysis, position").order("position"),
           client.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
@@ -658,7 +676,7 @@ export default function Home() {
           client.from("services").select("id, workspace_id, name, deliverables, deadline, deadline_unit, price, pricing_type, position").eq("workspace_id", currentWorkspaceId).order("position"),
         ]);
 
-    if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError || cadenceBlocksError || financeError || servicesError) {
+    if (goalsError || funnelsError || conversionSettingsError || goalSimulationStagesError || prospectListsError || prospectRecordsError || cadenceBlocksError || financeError || servicesError) {
       toast.error("Não foi possível carregar os dados salvos.");
       setIsCloudLoading(false);
       setIsCloudHydrating(false);
@@ -704,6 +722,7 @@ export default function Home() {
     const normalizedCadenceBlocks = ((cadenceBlockRows ?? []) as CadenceBlockRow[]).map((block) => ({ id: block.id, day: Number(block.day), slot: block.slot, title: block.title, channel: block.channel, notes: block.notes }));
     const normalizedFinanceEntries = ((financeRows ?? []) as FinanceEntryRow[]).map((entry) => ({ id: entry.id, expense: entry.expense, amount: Number(entry.amount), installment: entry.installment, dueDate: entry.due_date ?? "", notes: entry.notes }));
     const normalizedServices = ((serviceRows ?? []) as ServiceRow[]).map((service) => ({ id: service.id, name: service.name, deliverables: service.deliverables, deadline: Number(service.deadline), deadlineUnit: service.deadline_unit, price: Number(service.price), pricingType: service.pricing_type }));
+    const normalizedGoalSimulationStages = ((goalSimulationStageRows ?? []) as GoalSimulationStageRecord[]).map((stage) => ({ id: stage.id, name: stage.name, color: stage.color, probability: Number(stage.probability) }));
 
     const normalizedGoals = ((goalRows ?? []) as GoalRecord[]).map((goal) => ({
       id: goal.id,
@@ -751,6 +770,7 @@ export default function Home() {
     setGoals(normalizedGoals);
     setFunnels(normalizedFunnels);
     setConversionRates({ ...defaultConversionRates(normalizedFunnels), ...((conversionSettingsRow as ConversionSettingsRecord | null)?.rates ?? {}) });
+    setGoalSimulationStages(normalizedGoalSimulationStages.length ? normalizedGoalSimulationStages : initialGoalSimulationStages);
     setDeals(normalizedDeals);
     setCadenceBlocks(normalizedCadenceBlocks.length ? normalizedCadenceBlocks : initialCadenceBlocks);
     setFinanceEntries(normalizedFinanceEntries);
@@ -804,8 +824,9 @@ export default function Home() {
       window.localStorage.setItem("ritmo-cadence-blocks", JSON.stringify(cadenceBlocks));
       window.localStorage.setItem("ritmo-finance-entries", JSON.stringify(financeEntries));
       window.localStorage.setItem("ritmo-services", JSON.stringify(services));
+      window.localStorage.setItem("ritmo-goal-simulation-stages", JSON.stringify(goalSimulationStages));
     }
-  }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, financeEntries, services, workspaceId]);
+  }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, financeEntries, services, goalSimulationStages, workspaceId]);
 
   async function syncCurrentWorkspace() {
     if (!workspaceId) throw new Error("Workspace Supabase indisponível.");
@@ -821,6 +842,7 @@ export default function Home() {
       cadenceBlocks,
       financeEntries,
       services,
+      goalSimulationStages,
     } });
     if (syncAttemptRef.current === attempt) setIsSyncConfirmed(true);
   }
@@ -829,7 +851,7 @@ export default function Home() {
     if (!workspaceId || isCloudHydrating) return;
     void syncCurrentWorkspace().catch(() => toast.error("Não foi possível sincronizar os dados com o Supabase."));
     return;
-  }, [goals, funnels, deals, conversionRates, prospectLists, trashedProspectLists, cadenceBlocks, financeEntries, services, workspaceId, isCloudHydrating]);
+  }, [goals, funnels, deals, conversionRates, prospectLists, trashedProspectLists, cadenceBlocks, financeEntries, services, goalSimulationStages, workspaceId, isCloudHydrating]);
 
   const activeFunnel = funnels.find((funnel) => funnel.id === activeFunnelId) ?? funnels[0];
   const funnelDeals = useMemo(
@@ -1547,9 +1569,18 @@ export default function Home() {
             onEditGoal={openEditGoal}
             onDeleteGoal={deleteGoal}
             onReorderGoals={reorderGoals}
-            funnels={funnels}
-            conversionRates={conversionRates}
-            onSaveConversionRates={(rates) => { setConversionRates(rates); toast.success("Taxas de conversão salvas."); }}
+            simulationStages={goalSimulationStages}
+            onAddSimulationStage={() => {
+              const nextStage: GoalSimulationStage = { id: uniqueId("goal-simulation-stage"), name: "Nova etapa", color: "#10A97A", probability: 50 };
+              setGoalSimulationStages((current) => [...current, nextStage]);
+              toast.success("Etapa da simulação adicionada.");
+            }}
+            onUpdateSimulationStage={(id, field, value) => setGoalSimulationStages((current) => current.map((stage) => stage.id === id ? { ...stage, [field]: field === "probability" ? Math.min(100, Math.max(0, Number(value) || 0)) : value } : stage))}
+            onDeleteSimulationStage={(id) => setGoalSimulationStages((current) => {
+              if (current.length <= 2) { toast.info("Mantenha pelo menos duas etapas na simulação."); return current; }
+              toast.success("Etapa da simulação removida.");
+              return current.filter((stage) => stage.id !== id);
+            })}
           />
         ) : page === "pipeline" ? (
           <PipelineWorkspace
@@ -1786,7 +1817,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
   );
 }
 
-function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedMonthChange, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, funnels, conversionRates, onSaveConversionRates }: { goals: GoalItem[]; averageGoalProgress: number; selectedMonth: string; onSelectedMonthChange: (month: string) => void; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
+function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedMonthChange, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, simulationStages, onAddSimulationStage, onUpdateSimulationStage, onDeleteSimulationStage }: { goals: GoalItem[]; averageGoalProgress: number; selectedMonth: string; onSelectedMonthChange: (month: string) => void; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; simulationStages: GoalSimulationStage[]; onAddSimulationStage: () => void; onUpdateSimulationStage: (id: string, field: "name" | "color" | "probability", value: string | number) => void; onDeleteSimulationStage: (id: string) => void }) {
   const daysRemaining = daysUntilMonthEnd();
   const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date(`${selectedMonth}-01T12:00:00`));
   const calendarDays = useMemo(() => {
@@ -1814,40 +1845,35 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
           {goals.length === 0 && <button onClick={onNewGoal} className="flex items-center gap-2 text-sm font-bold text-[#087E5A]"><CirclePlus size={18} />Criar primeiro instrumento</button>}
           <div className="instrument-cell relative isolate overflow-hidden border-[#E5BE6B] bg-[#FFF4D9] shadow-[0_10px_24px_rgba(196,141,35,0.12)]"><div className="pointer-events-none absolute inset-x-5 bottom-4 top-[96px] -z-10 opacity-20"><div className="grid grid-cols-7 gap-x-3 gap-y-2 text-center text-[12px] font-bold text-[#C99D4B]">{["S", "T", "Q", "Q", "S", "S", "D"].map((day, index) => <span key={`weekday-${index}`} className="text-[9px] uppercase tracking-[0.12em] text-[#B78B38]">{day}</span>)}{calendarDays.map((day, index) => <span key={`day-${index}`} className={`rounded-md py-1 ${day === new Date().getDate() && selectedMonth === new Date().toISOString().slice(0, 7) ? "bg-[#E5BE6B] text-[#6B4D12]" : ""}`}>{day ?? ""}</span>)}</div></div><div className="relative z-10"><div className="flex items-center gap-2"><span className="pulse-dot bg-[#C88920]" /><span className="text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#8A651D]">Fechamento do mês</span></div><p className="mt-2 font-display text-[30px] font-extrabold leading-none tracking-[-0.065em] text-[#6B4D12]">{daysRemaining} {daysRemaining === 1 ? "dia útil" : "dias úteis"}</p><p className="mt-1 text-[11px] font-semibold capitalize text-[#8A6D2A]">restantes em {currentMonth}</p></div></div>
         </section>
-        <GoalSimulator funnels={funnels} conversionRates={conversionRates} onSaveConversionRates={onSaveConversionRates} />
+        <GoalSimulator stages={simulationStages} onAddStage={onAddSimulationStage} onUpdateStage={onUpdateSimulationStage} onDeleteStage={onDeleteSimulationStage} />
       </div>
     </div>
   );
 }
 
-function GoalSimulator({ funnels, conversionRates, onSaveConversionRates }: { funnels: SalesFunnel[]; conversionRates: ConversionRates; onSaveConversionRates: (rates: ConversionRates) => void }) {
-  const [selectedFunnelId, setSelectedFunnelId] = useState(funnels[0]?.id ?? "");
+function GoalSimulator({ stages, onAddStage, onUpdateStage, onDeleteStage }: { stages: GoalSimulationStage[]; onAddStage: () => void; onUpdateStage: (id: string, field: "name" | "color" | "probability", value: string | number) => void; onDeleteStage: (id: string) => void }) {
   const [leadInput, setLeadInput] = useState(120);
-  const [draftRates, setDraftRates] = useState<ConversionRates>(() => ({ ...defaultConversionRates(funnels), ...conversionRates }));
-  const activeFunnel = funnels.find((funnel) => funnel.id === selectedFunnelId) ?? funnels[0];
-
-  useEffect(() => {
-    setDraftRates({ ...defaultConversionRates(funnels), ...conversionRates });
-    if (!funnels.some((funnel) => funnel.id === selectedFunnelId)) setSelectedFunnelId(funnels[0]?.id ?? "");
-  }, [funnels, conversionRates, selectedFunnelId]);
-
-  if (!activeFunnel) return null;
-
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
   const leads = Math.max(0, Number(leadInput) || 0);
-  const projections = projectFunnelStages(activeFunnel.stages, leads, draftRates, isWonStage, isLostStage);
+  const stageName = (stage: GoalSimulationStage) => stage.name.trim().toLocaleLowerCase("pt-BR");
+  const isWonStage = (stage: GoalSimulationStage) => stageName(stage) === "ganho" || stageName(stage) === "ganha";
+  const isLostStage = (stage: GoalSimulationStage) => ["perdido", "perdida"].includes(stageName(stage));
+  const projections = projectFunnelStages(stages, leads, Object.fromEntries(stages.map((stage) => [stage.id, stage.probability])), isWonStage, isLostStage);
+  const projectionByStage = new Map(projections.map((projection) => [projection.stage.id, projection]));
   const finalProjection = projections.find(({ stage }) => isWonStage(stage))?.projected ?? projections.at(-1)?.projected ?? 0;
   const numberFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
-  const updateRate = (stageId: string, value: string) => setDraftRates((current) => ({ ...current, [stageId]: Math.min(100, Math.max(0, Number(value) || 0)) }));
-  const resetRates = () => setDraftRates(defaultConversionRates([activeFunnel]));
+  const startEditing = (stage: GoalSimulationStage) => { setEditingStageId(stage.id); setNameDraft(stage.name); };
+  const saveName = (stage: GoalSimulationStage) => { onUpdateStage(stage.id, "name", nameDraft.trim() || stage.name); setEditingStageId(null); };
 
   return <section className="surface-panel mt-5 overflow-hidden p-4 sm:p-6">
     <div className="flex flex-col gap-4 border-b border-[#E8ECE6] pb-5 lg:flex-row lg:items-end lg:justify-between">
-      <div><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><SlidersHorizontal size={16} /></span><p className="eyebrow">Planejamento de volume</p></div><h2 className="mt-2 section-title">Simulador de metas</h2></div>
-      <div className="flex flex-wrap items-end gap-3"><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Funil de referência</span><select className="form-select min-w-[190px]" value={activeFunnel.id} onChange={(event) => setSelectedFunnelId(event.target.value)}>{funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}</select></label><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Leads de entrada</span><Input min="0" type="number" value={leadInput} onChange={(event) => setLeadInput(Number(event.target.value))} className="h-10 w-[132px] bg-white font-bold" /></label></div>
+      <div><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><SlidersHorizontal size={16} /></span><p className="eyebrow">Planejamento de volume</p></div><h2 className="mt-2 section-title">Simulador de metas</h2><p className="mt-1 max-w-xl text-sm text-[#718078]">Uma jornada própria para testar cenários, sem alterar as etapas do funil principal.</p></div>
+      <div className="flex flex-wrap items-end gap-3"><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Leads de entrada</span><Input min="0" type="number" value={leadInput} onChange={(event) => setLeadInput(Number(event.target.value))} className="h-10 w-[132px] bg-white font-bold" /></label><Button type="button" onClick={onAddStage} className="h-10 gap-2 rounded-xl bg-[#18201E] px-4 text-xs font-extrabold text-white hover:bg-[#087E5A]"><CirclePlus size={15} />Adicionar etapa</Button></div>
     </div>
     <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
-      <div><div className="space-y-2">{projections.map(({ stage, rate }, index) => <div key={stage.id} className="grid grid-cols-[minmax(0,1fr)_92px] items-center gap-3 rounded-xl border border-[#E7EBE6] bg-[#FCFCFA] px-3 py-2.5"><div className="flex min-w-0 items-center gap-2.5"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} /><div className="min-w-0"><p className="truncate text-sm font-bold text-[#35403B]">{stage.name}</p><p className="text-[11px] text-[#8A9690]">{index === 0 ? "Base do simulador" : `${rate}% da etapa anterior`}</p></div></div><label className="relative"><span className="sr-only">Taxa para {stage.name}</span><Input min="0" max="100" step="0.1" type="number" value={rate} disabled={index === 0} onChange={(event) => updateRate(stage.id, event.target.value)} className="h-9 bg-white pr-7 text-right font-extrabold disabled:bg-[#F0F4F0] disabled:text-[#087E5A]" /><span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7C8A83]">%</span></label></div>)}</div><div className="mt-4 flex justify-end"><Button type="button" onClick={() => onSaveConversionRates(draftRates)} className="h-9 gap-2 rounded-xl bg-[#18201E] px-4 text-xs font-extrabold text-white hover:bg-[#087E5A]"><CheckCircle2 size={15} />Salvar taxas</Button></div></div>
-      <div className="rounded-2xl border border-[#D5E3DA] bg-[#F0F8F3] p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#5D7569]">Leitura projetada</p><p className="mt-1 text-sm font-bold text-[#27302D]">{activeFunnel.name}</p></div><span className="rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#087E5A]">{numberFormat.format(leads)} leads</span></div><div className="mt-4 space-y-2">{projections.map(({ stage, projected }, index) => <div key={stage.id} className="flex items-center gap-3"><div className="flex w-5 justify-center"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: stage.color }} /></div><p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#53665D]">{stage.name}</p><strong className="font-display text-lg tracking-[-0.04em] text-[#1B2522]">{numberFormat.format(projected)}</strong>{index < projections.length - 1 && <span className="sr-only">evolui para a próxima etapa</span>}</div>)}</div><div className="mt-5 border-t border-[#CFE0D5] pt-4"><p className="text-xs font-bold text-[#668074]">Fechamentos projetados em Ganho</p><p className="mt-1 font-display text-4xl font-extrabold tracking-[-0.07em] text-[#087E5A]">{numberFormat.format(finalProjection)}</p><p className="mt-1 text-xs leading-5 text-[#71887D]">Ajuste as taxas conforme os dados do seu histórico para tomar decisões de volume com mais precisão.</p></div></div>
+      <div><div className="space-y-2">{stages.map((stage, index) => { const projection = index === 0 ? { rate: 100, projected: leads } : projectionByStage.get(stage.id); const isEditing = editingStageId === stage.id; return <div key={stage.id} className="rounded-xl border border-[#E7EBE6] bg-[#FCFCFA] px-3 py-2.5"><div className="flex items-center gap-2.5"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} />{isEditing ? <Input autoFocus value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveName(stage); if (event.key === "Escape") setEditingStageId(null); }} className="h-8 min-w-0 flex-1 bg-white text-sm font-bold" /> : <p className="min-w-0 flex-1 truncate text-sm font-bold text-[#35403B]">{stage.name}</p>}<button type="button" onClick={() => isEditing ? saveName(stage) : startEditing(stage)} className="grid h-8 w-8 place-items-center rounded-lg text-[#718078] hover:bg-[#E8F6F0] hover:text-[#087E5A]" title={isEditing ? "Salvar nome" : "Editar etapa"} aria-label={isEditing ? `Salvar nome de ${stage.name}` : `Editar ${stage.name}`}>{isEditing ? <CheckCircle2 size={15} /> : <Pencil size={15} />}</button>{isEditing && <button type="button" onClick={() => setEditingStageId(null)} className="grid h-8 w-8 place-items-center rounded-lg text-[#718078] hover:bg-[#F6EAE8] hover:text-[#B44D46]" title="Cancelar edição" aria-label="Cancelar edição"><X size={15} /></button>}<button type="button" onClick={() => onDeleteStage(stage.id)} disabled={stages.length <= 2} className="grid h-8 w-8 place-items-center rounded-lg text-[#9C6D69] hover:bg-[#F6EAE8] hover:text-[#B44D46] disabled:cursor-not-allowed disabled:opacity-30" title={stages.length <= 2 ? "Mantenha pelo menos duas etapas" : "Excluir etapa"} aria-label={`Excluir ${stage.name}`}><Trash2 size={15} /></button></div><div className="mt-2 flex items-center gap-3 pl-5"><label className="flex items-center gap-2 text-[11px] font-semibold text-[#7A8981]"><span>Cor</span><input type="color" value={stage.color} onChange={(event) => onUpdateStage(stage.id, "color", event.target.value)} className="h-7 w-9 cursor-pointer rounded-md border border-[#DDE5DE] bg-white p-0.5" aria-label={`Cor de ${stage.name}`} /></label><label className="relative ml-auto w-[92px]"><span className="sr-only">Taxa para {stage.name}</span><Input min="0" max="100" step="0.1" type="number" value={index === 0 ? 100 : stage.probability} disabled={index === 0} onChange={(event) => onUpdateStage(stage.id, "probability", event.target.value)} className="h-9 bg-white pr-7 text-right font-extrabold disabled:bg-[#F0F4F0] disabled:text-[#087E5A]" /><span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7C8A83]">%</span></label><span className="text-[11px] text-[#8A9690]">{index === 0 ? "Base" : `${stage.probability}% da etapa anterior`}</span></div></div>; })}</div><p className="mt-3 text-[11px] leading-5 text-[#88958E]">A primeira etapa é a entrada e permanece em 100%. As taxas seguintes são editáveis e ficam salvas apenas nesta simulação.</p></div>
+      <div className="rounded-2xl border border-[#D5E3DA] bg-[#F0F8F3] p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#5D7569]">Leitura projetada</p><p className="mt-1 text-sm font-bold text-[#27302D]">Simulação independente</p></div><span className="rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#087E5A]">{numberFormat.format(leads)} leads</span></div><div className="mt-4 space-y-2">{stages.map((stage, index) => { const projection = index === 0 ? { projected: leads } : projectionByStage.get(stage.id); if (!projection) return null; return <div key={stage.id} className="flex items-center gap-3"><div className="flex w-5 justify-center"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: stage.color }} /></div><p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#53665D]">{stage.name}</p><strong className="font-display text-lg tracking-[-0.04em] text-[#1B2522]">{numberFormat.format(projection.projected)}</strong>{index < stages.length - 1 && <span className="sr-only">evolui para a próxima etapa</span>}</div>; })}</div><div className="mt-5 border-t border-[#CFE0D5] pt-4"><p className="text-xs font-bold text-[#668074]">Fechamentos projetados em Ganho</p><p className="mt-1 font-display text-4xl font-extrabold tracking-[-0.07em] text-[#087E5A]">{numberFormat.format(finalProjection)}</p><p className="mt-1 text-xs leading-5 text-[#71887D]">Ajuste as taxas conforme os dados do seu histórico para tomar decisões de volume com mais precisão.</p></div></div>
     </div>
   </section>;
 }

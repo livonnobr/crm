@@ -249,7 +249,8 @@ async function getWorkspaceSnapshot(workspaceId) {
     { data: prospectRecords, error: prospectRecordsError },
     { data: cadenceBlocks, error: cadenceError },
     { data: financeEntries, error: financeError },
-    { data: services, error: servicesError }
+    { data: services, error: servicesError },
+    { data: goalSimulationStages, error: goalSimulationStagesError }
   ] = await Promise.all([
     supabase.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, monthly_overrides, position, linked_funnel_id, linked_stage_id").eq("workspace_id", workspaceId).order("position", { ascending: true }),
     supabase.from("funnels").select("id, name, currency, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
@@ -257,9 +258,10 @@ async function getWorkspaceSnapshot(workspaceId) {
     prospectListIds.length ? supabase.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_role, decision_maker_email, decision_maker_phone, decision_maker_secondary_phone, monthly_visits, company, company_website, analysis, position").in("list_id", prospectListIds).order("position", { ascending: true }) : Promise.resolve({ data: [], error: null }),
     supabase.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
     supabase.from("finance_entries").select("id, workspace_id, expense, amount, installment, due_date, notes, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
-    supabase.from("services").select("id, workspace_id, name, deliverables, deadline, deadline_unit, price, pricing_type, position").eq("workspace_id", workspaceId).order("position", { ascending: true })
+    supabase.from("services").select("id, workspace_id, name, deliverables, deadline, deadline_unit, price, pricing_type, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
+    supabase.from("goal_simulation_stages").select("id, workspace_id, name, color, probability, position").eq("workspace_id", workspaceId).order("position", { ascending: true })
   ]);
-  const error = goalsError ?? funnelsError ?? conversionError ?? prospectListsError ?? prospectRecordsError ?? cadenceError ?? financeError ?? servicesError;
+  const error = goalsError ?? funnelsError ?? conversionError ?? prospectListsError ?? prospectRecordsError ?? cadenceError ?? financeError ?? servicesError ?? goalSimulationStagesError;
   if (error) throw error;
   const funnelIds = (funnels ?? []).map((funnel) => funnel.id);
   const [{ data: stages, error: stagesError }, { data: opportunities, error: opportunitiesError }] = funnelIds.length ? await Promise.all([
@@ -267,7 +269,7 @@ async function getWorkspaceSnapshot(workspaceId) {
     supabase.from("opportunities").select("id, funnel_id, stage_id, title, company, value, owner_initials, tag, next_activity, position, contact_name, contact_role, contact_email, contact_phone, company_data, activities, notes").in("funnel_id", funnelIds).order("position", { ascending: true })
   ]) : [{ data: [], error: null }, { data: [], error: null }];
   if (stagesError || opportunitiesError) throw stagesError ?? opportunitiesError;
-  return { goals: goals ?? [], funnels: funnels ?? [], stages: stages ?? [], opportunities: opportunities ?? [], conversionSettings: conversionSettings ?? null, prospectLists: prospectLists ?? [], prospectRecords: prospectRecords ?? [], cadenceBlocks: cadenceBlocks ?? [], financeEntries: financeEntries ?? [], services: services ?? [] };
+  return { goals: goals ?? [], funnels: funnels ?? [], stages: stages ?? [], opportunities: opportunities ?? [], conversionSettings: conversionSettings ?? null, prospectLists: prospectLists ?? [], prospectRecords: prospectRecords ?? [], cadenceBlocks: cadenceBlocks ?? [], financeEntries: financeEntries ?? [], services: services ?? [], goalSimulationStages: goalSimulationStages ?? [] };
 }
 async function syncWorkspaceSnapshot(workspaceId, state) {
   const supabase = getAdminClient();
@@ -279,6 +281,7 @@ async function syncWorkspaceSnapshot(workspaceId, state) {
   const cadenceBlocks = Array.isArray(state.cadenceBlocks) ? state.cadenceBlocks : [];
   const financeEntries = Array.isArray(state.financeEntries) ? state.financeEntries : [];
   const services = Array.isArray(state.services) ? state.services : [];
+  const goalSimulationStages = Array.isArray(state.goalSimulationStages) ? state.goalSimulationStages : [];
   const stageToFunnel = new Map(funnels.flatMap((funnel) => (funnel.stages ?? []).map((stage) => [mapStageReference(stage.id), mapFunnelReference(funnel.id)])));
   const funnelIds = funnels.map((funnel) => mapFunnelReference(funnel.id));
   const goalRows = goals.map((goal, position) => ({ id: entityUuid(goal.id, "goal"), workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goal.period, color: goal.color, recurring: Boolean(goal.recurring), monthly_overrides: goal.monthlyOverrides ?? {}, linked_funnel_id: mapGoalReference(goal.linkedFunnelId, "funnel"), linked_stage_id: mapGoalReference(goal.linkedStageId, "stage"), position }));
@@ -288,6 +291,19 @@ async function syncWorkspaceSnapshot(workspaceId, state) {
   }
   const { error: conversionError } = await supabase.from("conversion_settings").upsert({ workspace_id: workspaceId, rates: state.conversionRates ?? {}, updated_at: (/* @__PURE__ */ new Date()).toISOString() });
   if (conversionError) throw conversionError;
+  const { data: existingGoalSimulationStages, error: goalSimulationStagesReadError } = await supabase.from("goal_simulation_stages").select("id").eq("workspace_id", workspaceId);
+  if (goalSimulationStagesReadError) throw goalSimulationStagesReadError;
+  const goalSimulationStageRows = goalSimulationStages.map((stage, position) => ({ id: entityUuid(stage.id, "goal-simulation-stage"), workspace_id: workspaceId, name: stage.name, color: stage.color, probability: Math.min(100, Math.max(0, Number(stage.probability) || 0)), position, updated_at: (/* @__PURE__ */ new Date()).toISOString() }));
+  const goalSimulationStageIds = goalSimulationStageRows.map((row) => row.id);
+  const staleGoalSimulationStages = (existingGoalSimulationStages ?? []).map((row) => row.id).filter((id) => !goalSimulationStageIds.includes(id));
+  if (staleGoalSimulationStages.length) {
+    const result = await supabase.from("goal_simulation_stages").delete().in("id", staleGoalSimulationStages);
+    if (result.error) throw result.error;
+  }
+  if (goalSimulationStageRows.length) {
+    const result = await supabase.from("goal_simulation_stages").upsert(goalSimulationStageRows);
+    if (result.error) throw result.error;
+  }
   const { data: existingFunnels, error: existingFunnelsError } = await supabase.from("funnels").select("id").eq("workspace_id", workspaceId);
   if (existingFunnelsError) throw existingFunnelsError;
   const staleFunnelIds = (existingFunnels ?? []).map((row) => row.id).filter((id) => !funnelIds.includes(id));

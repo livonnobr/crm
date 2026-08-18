@@ -8,6 +8,7 @@ export type WorkspaceSnapshotPayload = {
   cadenceBlocks?: unknown[];
   financeEntries?: unknown[];
   services?: unknown[];
+  goalSimulationStages?: unknown[];
 };
 
 /**
@@ -28,5 +29,6 @@ export function snapshotHasPersistedData(snapshot: WorkspaceSnapshotPayload | nu
     snapshot.cadenceBlocks,
     snapshot.financeEntries,
     snapshot.services,
+    snapshot.goalSimulationStages,
   ].some((collection) => Array.isArray(collection) && collection.length > 0);
 }
