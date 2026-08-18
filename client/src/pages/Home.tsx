@@ -1065,6 +1065,26 @@ export default function Home() {
     setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, records: list.records.map((prospect) => prospect.id === id ? { ...prospect, [field]: value } : prospect) } : list));
   }
 
+  function updatePersonFromPeople(listId: string, id: string, field: keyof Pick<ProspectRecord, "decisionMakerFirstName" | "decisionMakerLastName" | "decisionMakerRole" | "decisionMakerEmail" | "decisionMakerPhone">, value: string) {
+    const list = prospectLists.find((item) => item.id === listId);
+    const record = list?.records.find((item) => item.id === id);
+    if (!list || !record) return;
+    const nextRecord = { ...record, [field]: value };
+    setProspectLists((current) => current.map((currentList) => currentList.id === listId ? { ...currentList, records: currentList.records.map((prospect) => prospect.id === id ? nextRecord : prospect) } : currentList));
+
+    setDeals((current) => current.map((deal) => {
+      if (deal.companyData?.__ritmoProspectId !== id || deal.companyData?.__ritmoProspectListId !== listId) return deal;
+      const nextContactName = `${nextRecord.decisionMakerFirstName} ${nextRecord.decisionMakerLastName}`.trim();
+      const contactPatch: Partial<Deal> = {
+        contactName: nextContactName,
+        contactRole: nextRecord.decisionMakerRole,
+        contactEmail: nextRecord.decisionMakerEmail,
+        contactPhone: nextRecord.decisionMakerPhone,
+      };
+      return { ...deal, ...contactPatch };
+    }));
+  }
+
   function reorderProspects(fromId: string, toId: string) {
     if (!activeProspectList || fromId === toId) return;
     setProspectLists((current) => current.map((list) => {
@@ -1084,7 +1104,7 @@ export default function Home() {
       toast.error("Aguarde a conexão autenticada do Ritmo antes de salvar esta Empresa.");
       return;
     }
-    const list = activeProspectList;
+    const list = prospectLists.find((item) => item.records.some((prospect) => prospect.id === id));
     const record = list?.records.find((item) => item.id === id);
     if (!list || !record) return;
     setSavingProspectId(id);
@@ -1751,7 +1771,7 @@ export default function Home() {
         ) : page === "activities" ? (
           <ActivitiesWorkspace deals={openDeals} onToggleActivity={toggleWorkspaceActivity} onOpenDeal={openDealDetail} onNewDeal={openNewDeal} />
         ) : page === "people" ? (
-          <PeopleWorkspace lists={prospectLists.filter((list) => !list.deletedAt)} />
+          <PeopleWorkspace lists={prospectLists.filter((list) => !list.deletedAt)} onUpdate={updatePersonFromPeople} onSave={saveProspectToCloud} savingPersonId={savingProspectId} />
         ) : page === "finance" ? (
           <FinanceWorkspace entries={financeEntries} onAdd={addFinanceEntry} onUpdate={updateFinanceEntry} onDelete={deleteFinanceEntry} />
         ) : page === "services" ? (
@@ -2062,9 +2082,25 @@ function GoalRow({ goal, funnels, onReorder }: { goal: GoalItem; funnels: SalesF
   </div>;
 }
 
-function PeopleWorkspace({ lists }: { lists: ProspectList[] }) {
-  const people = lists.flatMap((list) => list.records.map((record) => ({ ...record, listName: list.name })));
-  return <div className="pt-[68px] md:pt-0"><header className="flex min-h-[116px] items-center justify-between px-5 py-6 md:px-10"><div><p className="eyebrow">Relacionamentos comerciais</p><h1 className="page-title">Pessoas <span className="text-[#10A97A]">em contato</span></h1></div><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-extrabold text-[#087E5E]">{people.length} {people.length === 1 ? "pessoa" : "pessoas"}</span></header><div className="px-5 pb-12 md:px-10"><section className="surface-panel overflow-hidden p-4 sm:p-6"><div className="mb-5"><p className="eyebrow">Base de pessoas</p><h2 className="section-title">Decisores das suas empresas</h2><p className="mt-1 text-sm text-[#718078]">Uma visão dedicada aos contatos, separada da aba Empresas.</p></div>{people.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{people.map((person) => <article key={person.id} className="rounded-2xl border border-[#E2E9E2] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#BFD6C8] hover:shadow-[0_10px_24px_rgba(30,55,44,0.06)]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate font-display text-lg font-extrabold tracking-[-0.03em] text-[#27302D]">{`${person.decisionMakerFirstName} ${person.decisionMakerLastName}`.trim() || "Pessoa sem nome"}</h3><p className="mt-1 truncate text-xs font-bold text-[#087E5A]">{person.decisionMakerRole || "Cargo não informado"}</p></div><span className="h-2 w-2 shrink-0 rounded-full bg-[#10A97A]" /></div><div className="mt-4 space-y-2 text-sm text-[#5E7067]"><p className="truncate"><strong className="text-[#27302D]">Empresa:</strong> {person.company || "Não informada"}</p><p className="truncate"><strong className="text-[#27302D]">E-mail:</strong> {person.decisionMakerEmail || "Não informado"}</p><p><strong className="text-[#27302D]">Telefone:</strong> {person.decisionMakerPhone || "Não informado"}</p></div><p className="mt-4 border-t border-[#E8EDE8] pt-3 text-[11px] font-bold uppercase tracking-[0.1em] text-[#8A9690]">Lista · {person.listName}</p></article>)}</div> : <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-[#D6DED8] bg-[#FAFBF9] p-6 text-center"><Users className="mb-2 h-6 w-6 text-[#10A97A]" /><p className="font-bold text-[#27302D]">Ainda não há pessoas cadastradas</p><p className="mt-1 text-sm text-[#718078]">Adicione contatos na aba Empresas para vê-los aqui.</p></div>}</section></div></div>;
+function PeopleWorkspace({
+  lists,
+  onUpdate,
+  onSave,
+  savingPersonId,
+}: {
+  lists: ProspectList[];
+  onUpdate: (listId: string, id: string, field: keyof Pick<ProspectRecord, "decisionMakerFirstName" | "decisionMakerLastName" | "decisionMakerRole" | "decisionMakerEmail" | "decisionMakerPhone">, value: string) => void;
+  onSave: (id: string) => Promise<void>;
+  savingPersonId: string | null;
+}) {
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
+  const people = lists.flatMap((list) => list.records.map((record) => ({ ...record, listId: list.id, listName: list.name })));
+
+  return <div className="pt-[68px] md:pt-0"><header className="flex min-h-[116px] items-center justify-between px-5 py-6 md:px-10"><div><p className="eyebrow">Relacionamentos comerciais</p><h1 className="page-title">Pessoas <span className="text-[#10A97A]">em contato</span></h1></div><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-extrabold text-[#087E5E]">{people.length} {people.length === 1 ? "pessoa" : "pessoas"}</span></header><div className="px-5 pb-12 md:px-10"><section className="surface-panel overflow-hidden p-4 sm:p-6"><div className="mb-5"><p className="eyebrow">Base de pessoas</p><h2 className="section-title">Decisores das suas empresas</h2><p className="mt-1 text-sm text-[#718078]">Edite os dados por aqui e eles serão refletidos nos cards do funil.</p></div>{people.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{people.map((person) => {
+    const isEditing = editingPersonId === person.id;
+    const update = (field: keyof Pick<ProspectRecord, "decisionMakerFirstName" | "decisionMakerLastName" | "decisionMakerRole" | "decisionMakerEmail" | "decisionMakerPhone">, value: string) => onUpdate(person.listId, person.id, field, value);
+    return <article key={person.id} className="rounded-2xl border border-[#E2E9E2] bg-[#FCFCFA] p-4 transition hover:-translate-y-0.5 hover:border-[#BFD6C8] hover:shadow-[0_10px_24px_rgba(30,55,44,0.06)]"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><h3 className="truncate font-display text-lg font-extrabold tracking-[-0.03em] text-[#27302D]">{`${person.decisionMakerFirstName} ${person.decisionMakerLastName}`.trim() || "Pessoa sem nome"}</h3><p className="mt-1 truncate text-xs font-bold text-[#087E5A]">{person.decisionMakerRole || "Cargo não informado"}</p></div>{isEditing ? <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#63736B] hover:bg-[#E8F6F0] hover:text-[#087E5A]" onClick={() => setEditingPersonId(null)} aria-label="Cancelar edição"><X size={16} /></Button> : <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#63736B] hover:bg-[#E8F6F0] hover:text-[#087E5A]" onClick={() => setEditingPersonId(person.id)} aria-label="Editar pessoa"><Pencil size={15} /></Button>}</div>{isEditing ? <div className="mt-4 space-y-3"><div className="grid gap-3 sm:grid-cols-2"><FormField label="Nome"><Input value={person.decisionMakerFirstName} onChange={(event) => update("decisionMakerFirstName", event.target.value)} /></FormField><FormField label="Sobrenome"><Input value={person.decisionMakerLastName} onChange={(event) => update("decisionMakerLastName", event.target.value)} /></FormField></div><FormField label="Cargo"><Input value={person.decisionMakerRole} onChange={(event) => update("decisionMakerRole", event.target.value)} placeholder="Cargo" /></FormField><FormField label="E-mail"><Input type="email" value={person.decisionMakerEmail} onChange={(event) => update("decisionMakerEmail", event.target.value)} placeholder="contato@empresa.com" /></FormField><FormField label="Telefone"><Input value={person.decisionMakerPhone} onChange={(event) => update("decisionMakerPhone", event.target.value)} placeholder="(11) 99999-9999" /></FormField><div className="flex items-center justify-between border-t border-[#E8EDE8] pt-3"><span className="truncate pr-3 text-xs text-[#718078]">Empresa: {person.company || "Não informada"}</span><Button type="button" className="h-8 shrink-0 gap-1.5 bg-[#10A97A] px-3 text-xs font-bold hover:bg-[#087E5A]" disabled={savingPersonId === person.id} onClick={() => { void onSave(person.id); setEditingPersonId(null); }}><CheckCircle2 size={14} />{savingPersonId === person.id ? "Salvando..." : "Salvar"}</Button></div></div> : <><div className="mt-4 space-y-2 text-sm text-[#5E7067]"><p className="truncate"><strong className="text-[#27302D]">Empresa:</strong> {person.company || "Não informada"}</p><p className="truncate"><strong className="text-[#27302D]">E-mail:</strong> {person.decisionMakerEmail || "Não informado"}</p><p><strong className="text-[#27302D]">Telefone:</strong> {person.decisionMakerPhone || "Não informado"}</p></div><p className="mt-4 border-t border-[#E8EDE8] pt-3 text-[11px] font-bold uppercase tracking-[0.1em] text-[#8A9690]">Lista · {person.listName}</p></>}</article>;
+  })}</div> : <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-[#D6DED8] bg-[#FAFBF9] p-6 text-center"><Users className="mb-2 h-6 w-6 text-[#10A97A]" /><p className="font-bold text-[#27302D]">Ainda não há pessoas cadastradas</p><p className="mt-1 text-sm text-[#718078]">Adicione contatos na aba Empresas para vê-los aqui.</p></div>}</section></div></div>;
 }
 
 function ProspectingMetric({ label, value, detail, accent = false }: { label: string; value: string; detail: string; accent?: boolean }) {
