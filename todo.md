@@ -366,3 +366,7 @@
 
 - [x] Criar login próprio do Ritmo integrado ao Supabase, com dados isolados por usuário/workspace
 - [x] Remover da aba Empresas todos os botões e textos explícitos de “Salvar no Supabase”, mantendo salvamento automático
+
+- [x] Auditar divergência entre GitHub, branch ritmo-crm, projeto Vercel e domínio público após alterações que não apareceram no deploy; GitHub e Vercel estão no commit 2f9af45 e o domínio oficial serve a tela própria de login
+
+- [x] Remover o aviso “Rascunho local — ainda não está salvo no Supabase” da aba Empresas e exibir apenas sincronização automática

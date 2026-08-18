@@ -6,10 +6,10 @@ export function persistenceStatus(workspaceId: string | null | undefined): Persi
 
 export function persistenceLabel(workspaceId: string | null | undefined): string {
   return persistenceStatus(workspaceId) === "cloud"
-    ? "Sincronizado com o Supabase"
-    : "Rascunho local — ainda não está salvo no Supabase";
+    ? "Sincronizado automaticamente"
+    : "Sincronização pendente";
 }
 
 export function persistenceActionLabel(workspaceId: string | null | undefined): string {
-  return persistenceStatus(workspaceId) === "cloud" ? "Salvar" : "Salvar no Supabase";
+  return "Sincronização automática";
 }

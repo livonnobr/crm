@@ -4,13 +4,13 @@ import { persistenceActionLabel, persistenceLabel, persistenceStatus } from "./p
 describe("persistence status", () => {
   it("treats a workspace id as cloud-synced", () => {
     expect(persistenceStatus("workspace-123")).toBe("cloud");
-    expect(persistenceLabel("workspace-123")).toBe("Sincronizado com o Supabase");
-    expect(persistenceActionLabel("workspace-123")).toBe("Salvar");
+    expect(persistenceLabel("workspace-123")).toBe("Sincronizado automaticamente");
+    expect(persistenceActionLabel("workspace-123")).toBe("Sincronização automática");
   });
 
   it("treats a missing workspace as local-only", () => {
     expect(persistenceStatus(null)).toBe("local");
-    expect(persistenceLabel(null)).toContain("Rascunho local");
-    expect(persistenceActionLabel(null)).toBe("Salvar no Supabase");
+    expect(persistenceLabel(null)).toBe("Sincronização pendente");
+    expect(persistenceActionLabel(null)).toBe("Sincronização automática");
   });
 });
