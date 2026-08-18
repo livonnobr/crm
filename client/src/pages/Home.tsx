@@ -854,23 +854,24 @@ export default function Home() {
     if (syncAttemptRef.current === attempt) setIsSyncConfirmed(true);
   }
 
-  async function saveGoalsToCloud() {
+  async function saveGoalsToCloud(goalsToSave: GoalItem[] = goals, options: { notify?: boolean } = {}) {
     if (!workspaceId) {
       toast.error("Aguarde a conexão autenticada do Ritmo antes de salvar o Planejamento de Metas.");
-      return;
+      throw new Error("Workspace Supabase indisponível.");
     }
     setIsGoalsSaving(true);
     setIsGoalsSyncConfirmed(false);
     try {
       await syncGoalsMutation.mutateAsync({
-        goals: goals.map((goal) => ({ ...goal, period: goalPeriodValue(goal) })),
+        goals: goalsToSave.map((goal) => ({ ...goal, period: goalPeriodValue(goal) })),
         goalSimulationStages,
       });
       setIsGoalsSyncConfirmed(true);
-      toast.success("Planejamento de Metas salvo no Supabase.");
-    } catch {
+      if (options.notify !== false) toast.success("Planejamento de Metas salvo no Supabase.");
+    } catch (error) {
       setIsGoalsSyncConfirmed(false);
       toast.error("Não foi possível salvar o Planejamento de Metas no Supabase.");
+      throw error;
     } finally {
       setIsGoalsSaving(false);
     }
@@ -1175,9 +1176,10 @@ export default function Home() {
     setGoalDialogOpen(true);
   }
   function openEditGoal(goal: GoalItem) {
-    const override = goal.recurring ? goal.monthlyOverrides?.[selectedGoalMonth] : undefined;
+    const sourceGoal = goals.find((item) => item.id === goal.id) ?? goal;
+    const override = sourceGoal.recurring ? sourceGoal.monthlyOverrides?.[selectedGoalMonth] : undefined;
     setGoalOverrideMonth(override ? selectedGoalMonth : null);
-    setGoalDraft(override ? { ...goal, target: override.target, actual: override.actual } : goal);
+    setGoalDraft(override ? { ...sourceGoal, target: override.target, actual: override.actual } : sourceGoal);
     setGoalDialogOpen(true);
   }
 
@@ -1207,28 +1209,34 @@ export default function Home() {
     });
   }
 
-  function saveGoal(event: FormEvent<HTMLFormElement>) {
+  async function saveGoal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!goalDraft.title.trim() || goalDraft.target <= 0) {
       toast.error("Dê um nome e um objetivo válido para a meta.");
       return;
     }
     setIsGoalsSyncConfirmed(false);
+    let nextGoals: GoalItem[];
     if (goalDraft.id) {
-      setGoals((current) => current.map((goal) => {
+      nextGoals = goals.map((goal) => {
         if (goal.id !== goalDraft.id) return goal;
         if (goalOverrideMonth && goal.recurring) {
           return { ...goal, monthlyOverrides: { ...(goal.monthlyOverrides ?? {}), [goalOverrideMonth]: { target: goalDraft.target, actual: goalDraft.actual } } };
         }
         return { ...goalDraft, monthlyOverrides: goal.monthlyOverrides ?? goalDraft.monthlyOverrides ?? {} };
-      }));
-      toast.success(goalOverrideMonth ? `Exceção salva para ${goalOverrideMonth}.` : "Meta atualizada.");
+      });
     } else {
-      setGoals((current) => [{ ...goalDraft, id: uniqueId("goal"), position: 0 }, ...current.map((goal, index) => ({ ...goal, position: index + 1 }))]);
-      toast.success("Meta criada e adicionada ao seu ritmo.");
+      nextGoals = [{ ...goalDraft, id: uniqueId("goal"), position: 0 }, ...goals.map((goal, index) => ({ ...goal, position: index + 1 }))];
     }
-        setGoalOverrideMonth(null);
+    setGoals(nextGoals);
+    setGoalOverrideMonth(null);
     setGoalDialogOpen(false);
+    try {
+      await saveGoalsToCloud(nextGoals, { notify: false });
+      toast.success(goalDraft.id ? (goalOverrideMonth ? `Exceção salva para ${selectedGoalMonth}.` : "Meta atualizada no Supabase.") : "Meta criada e salva no Supabase.");
+    } catch {
+      // saveGoalsToCloud already reports the persistence error; the local card remains updated.
+    }
   }
   async function deleteGoal(goalId: string) {
     setIsGoalsSyncConfirmed(false);
@@ -1730,7 +1738,7 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Objetivo"><Input min="1" type="number" value={goalDraft.target || ""} onChange={(event) => setGoalDraft({ ...goalDraft, target: Number(event.target.value) })} placeholder="0" /></FormField>
-              <FormField label="Realizado até agora"><Input min="0" type="number" value={goalDraft.actual || ""} onChange={(event) => setGoalDraft({ ...goalDraft, actual: Number(event.target.value) })} placeholder="0" /></FormField>
+              <FormField label="Realizado até agora"><Input min="0" type="number" value={goalDraft.actual || ""} disabled={Boolean(goalDraft.linkedStageId)} onChange={(event) => setGoalDraft({ ...goalDraft, actual: Number(event.target.value) })} placeholder="0" />{goalDraft.linkedStageId && <p className="mt-1 text-xs text-[#7D8983]">Atualizado automaticamente pelo funil vinculado.</p>}</FormField>
             </div>
             <div className="grid gap-4 sm:grid-cols-2"><FormField label="Periodicidade"><select className="form-select" value={goalDraft.cadence} onChange={(event) => { const cadence = event.target.value as GoalCadence; setGoalDraft({ ...goalDraft, cadence, period: goalPeriodInputValue({ ...goalDraft, cadence }) }); }}><option>Diária</option><option>Semanal</option><option>Mensal</option></select></FormField><FormField label={goalDraft.cadence === "Mensal" ? "Mês da meta" : goalDraft.cadence === "Semanal" ? "Semana da meta" : "Dia da meta"}><Input type={goalPeriodInputType(goalDraft.cadence)} value={goalPeriodInputValue(goalDraft)} onChange={(event) => setGoalDraft({ ...goalDraft, period: event.target.value })} aria-label="Selecionar período da meta" className="bg-white" /></FormField></div>
             <label className="flex items-center gap-3 rounded-xl border border-[#DDE8E1] bg-[#F5FAF7] px-3 py-3 text-sm font-semibold text-[#35403B]"><input type="checkbox" checked={goalDraft.recurring} onChange={(event) => { const recurring = event.target.checked; setGoalDraft({ ...goalDraft, recurring }); if (!recurring) setGoalOverrideMonth(null); }} className="h-4 w-4 accent-[#10A97A]" />Meta recorrente<span className="ml-auto text-xs font-medium text-[#7D8983]">Repete sem duplicar</span></label>
