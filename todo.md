@@ -286,3 +286,5 @@
 
 - [x] Restaurar edição e exclusão nos cards superiores de metas
 - [x] Inserir novas metas automaticamente no primeiro card, preservando a ordem manual
+
+- [x] Exibir todas as metas cadastradas no topo da aba Metas, sem limitar aos três primeiros cards
