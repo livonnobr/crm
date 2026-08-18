@@ -292,6 +292,59 @@ async function syncService(workspaceId, service) {
   if (error) throw error;
   return { ok: true, id: row.id };
 }
+async function syncGoalsWorkspace(workspaceId, goals, goalSimulationStages) {
+  const supabase = getAdminClient();
+  const goalRows = goals.map((goal, position) => ({
+    id: entityUuid(goal.id, "goal"),
+    workspace_id: workspaceId,
+    title: String(goal.title ?? "").trim() || "Nova meta",
+    goal_type: goal.type,
+    target: Math.max(0, Number(goal.target) || 0),
+    actual: Math.max(0, Number(goal.actual) || 0),
+    unit: goal.unit,
+    period: goal.period,
+    color: goal.color,
+    recurring: Boolean(goal.recurring),
+    monthly_overrides: goal.monthlyOverrides ?? {},
+    linked_funnel_id: mapGoalReference(goal.linkedFunnelId, "funnel"),
+    linked_stage_id: mapGoalReference(goal.linkedStageId, "stage"),
+    position
+  }));
+  const { data: existingGoals, error: existingGoalsError } = await supabase.from("goals").select("id").eq("workspace_id", workspaceId);
+  if (existingGoalsError) throw existingGoalsError;
+  const goalIds = goalRows.map((row) => row.id);
+  const staleGoalIds = (existingGoals ?? []).map((row) => row.id).filter((id) => !goalIds.includes(id));
+  if (staleGoalIds.length) {
+    const result = await supabase.from("goals").delete().in("id", staleGoalIds);
+    if (result.error) throw result.error;
+  }
+  if (goalRows.length) {
+    const result = await supabase.from("goals").upsert(goalRows);
+    if (result.error) throw result.error;
+  }
+  const { data: existingGoalSimulationStages, error: goalSimulationStagesReadError } = await supabase.from("goal_simulation_stages").select("id").eq("workspace_id", workspaceId);
+  if (goalSimulationStagesReadError) throw goalSimulationStagesReadError;
+  const goalSimulationStageRows = goalSimulationStages.map((stage, position) => ({
+    id: entityUuid(stage.id, "goal-simulation-stage"),
+    workspace_id: workspaceId,
+    name: String(stage.name ?? "Nova etapa").trim() || "Nova etapa",
+    color: stage.color,
+    probability: Math.min(100, Math.max(0, Number(stage.probability) || 0)),
+    position,
+    updated_at: (/* @__PURE__ */ new Date()).toISOString()
+  }));
+  const goalSimulationStageIds = goalSimulationStageRows.map((row) => row.id);
+  const staleGoalSimulationStages = (existingGoalSimulationStages ?? []).map((row) => row.id).filter((id) => !goalSimulationStageIds.includes(id));
+  if (staleGoalSimulationStages.length) {
+    const result = await supabase.from("goal_simulation_stages").delete().in("id", staleGoalSimulationStages);
+    if (result.error) throw result.error;
+  }
+  if (goalSimulationStageRows.length) {
+    const result = await supabase.from("goal_simulation_stages").upsert(goalSimulationStageRows);
+    if (result.error) throw result.error;
+  }
+  return { ok: true };
+}
 async function syncWorkspaceSnapshot(workspaceId, state) {
   const supabase = getAdminClient();
   const goals = Array.isArray(state.goals) ? state.goals : [];
@@ -459,6 +512,10 @@ var appRouter = router({
     syncService: publicProcedure.input(z2.object({ service: z2.any() })).mutation(async ({ ctx, input }) => {
       const workspace = await ensureWorkspaceForSupabaseToken(ctx.req.headers.authorization);
       return syncService(workspace.workspaceId, input.service);
+    }),
+    syncGoals: publicProcedure.input(z2.object({ goals: z2.array(z2.any()), goalSimulationStages: z2.array(z2.any()) })).mutation(async ({ ctx, input }) => {
+      const workspace = await ensureWorkspaceForSupabaseToken(ctx.req.headers.authorization);
+      return syncGoalsWorkspace(workspace.workspaceId, input.goals, input.goalSimulationStages);
     })
   }),
   auth: router({

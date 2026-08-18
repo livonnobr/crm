@@ -595,6 +595,7 @@ export default function Home() {
   const workspaceSnapshot = trpc.workspace.snapshot.useQuery(undefined, { enabled: isAuthenticated });
   const syncWorkspaceMutation = trpc.workspace.sync.useMutation();
   const syncServiceMutation = trpc.workspace.syncService.useMutation();
+  const syncGoalsMutation = trpc.workspace.syncGoals.useMutation();
 
   const [page, setPage] = useState<Page>(() => {
     const tab = new URLSearchParams(window.location.search).get("aba");
@@ -620,6 +621,8 @@ export default function Home() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const [isSyncConfirmed, setIsSyncConfirmed] = useState(false);
+  const [isGoalsSyncConfirmed, setIsGoalsSyncConfirmed] = useState(false);
+  const [isGoalsSaving, setIsGoalsSaving] = useState(false);
   const syncAttemptRef = useRef(0);
   const [isCloudLoading, setIsCloudLoading] = useState(isSupabaseConfigured);
   const [isCloudHydrating, setIsCloudHydrating] = useState(false);
@@ -782,6 +785,7 @@ export default function Home() {
     setActiveProspectListId(normalizedProspectLists[0]?.id ?? initialProspectLists[0].id);
     setActiveFunnelId(normalizedFunnels[0]?.id ?? "");
     setWorkspaceId(currentWorkspaceId);
+    setIsGoalsSyncConfirmed(true);
     setIsCloudLoading(false);
     setIsCloudHydrating(false);
   }
@@ -847,6 +851,28 @@ export default function Home() {
       goalSimulationStages,
     } });
     if (syncAttemptRef.current === attempt) setIsSyncConfirmed(true);
+  }
+
+  async function saveGoalsToCloud() {
+    if (!workspaceId) {
+      toast.error("Aguarde a conexão autenticada do Ritmo antes de salvar o Planejamento de Metas.");
+      return;
+    }
+    setIsGoalsSaving(true);
+    setIsGoalsSyncConfirmed(false);
+    try {
+      await syncGoalsMutation.mutateAsync({
+        goals: goals.map((goal) => ({ ...goal, period: goalPeriodValue(goal) })),
+        goalSimulationStages,
+      });
+      setIsGoalsSyncConfirmed(true);
+      toast.success("Planejamento de Metas salvo no Supabase.");
+    } catch {
+      setIsGoalsSyncConfirmed(false);
+      toast.error("Não foi possível salvar o Planejamento de Metas no Supabase.");
+    } finally {
+      setIsGoalsSaving(false);
+    }
   }
 
   useEffect(() => {
@@ -1142,6 +1168,7 @@ export default function Home() {
 
   function reorderGoals(fromId: string, toId: string) {
     if (fromId === toId) return;
+    setIsGoalsSyncConfirmed(false);
     setGoals((current) => {
       const fromIndex = current.findIndex((goal) => goal.id === fromId);
       const toIndex = current.findIndex((goal) => goal.id === toId);
@@ -1154,6 +1181,7 @@ export default function Home() {
   }
 
   function moveGoal(goalId: string, direction: "up" | "down") {
+    setIsGoalsSyncConfirmed(false);
     setGoals((current) => {
       const index = current.findIndex((goal) => goal.id === goalId);
       const nextIndex = direction === "up" ? index - 1 : index + 1;
@@ -1170,6 +1198,7 @@ export default function Home() {
       toast.error("Dê um nome e um objetivo válido para a meta.");
       return;
     }
+    setIsGoalsSyncConfirmed(false);
     if (goalDraft.id) {
       setGoals((current) => current.map((goal) => {
         if (goal.id !== goalDraft.id) return goal;
@@ -1187,6 +1216,7 @@ export default function Home() {
     setGoalDialogOpen(false);
   }
   async function deleteGoal(goalId: string) {
+    setIsGoalsSyncConfirmed(false);
     if (workspaceId && supabase) {
       const { error } = await getSupabaseClient().from("goals").delete().eq("id", goalId);
       if (error) {
@@ -1595,16 +1625,20 @@ export default function Home() {
             onReorderGoals={reorderGoals}
             simulationStages={goalSimulationStages}
             onAddSimulationStage={() => {
+              setIsGoalsSyncConfirmed(false);
               const nextStage: GoalSimulationStage = { id: uniqueId("goal-simulation-stage"), name: "Nova etapa", color: "#10A97A", probability: 50 };
               setGoalSimulationStages((current) => [...current, nextStage]);
               toast.success("Etapa da simulação adicionada.");
             }}
-            onUpdateSimulationStage={(id, field, value) => setGoalSimulationStages((current) => current.map((stage) => stage.id === id ? { ...stage, [field]: field === "probability" ? Math.min(100, Math.max(0, Number(value) || 0)) : value } : stage))}
-            onDeleteSimulationStage={(id) => setGoalSimulationStages((current) => {
+            onUpdateSimulationStage={(id, field, value) => { setIsGoalsSyncConfirmed(false); setGoalSimulationStages((current) => current.map((stage) => stage.id === id ? { ...stage, [field]: field === "probability" ? Math.min(100, Math.max(0, Number(value) || 0)) : value } : stage)); }}
+            onDeleteSimulationStage={(id) => { setIsGoalsSyncConfirmed(false); setGoalSimulationStages((current) => {
               if (current.length <= 2) { toast.info("Mantenha pelo menos duas etapas na simulação."); return current; }
               toast.success("Etapa da simulação removida.");
               return current.filter((stage) => stage.id !== id);
-            })}
+            }); }}
+            onSave={saveGoalsToCloud}
+            isSaving={isGoalsSaving}
+            syncConfirmed={isGoalsSyncConfirmed}
           />
         ) : page === "pipeline" ? (
           <PipelineWorkspace
@@ -1841,7 +1875,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
   );
 }
 
-function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedMonthChange, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, simulationStages, onAddSimulationStage, onUpdateSimulationStage, onDeleteSimulationStage }: { goals: GoalItem[]; averageGoalProgress: number; selectedMonth: string; onSelectedMonthChange: (month: string) => void; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; simulationStages: GoalSimulationStage[]; onAddSimulationStage: () => void; onUpdateSimulationStage: (id: string, field: "name" | "color" | "probability", value: string | number) => void; onDeleteSimulationStage: (id: string) => void }) {
+function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedMonthChange, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, simulationStages, onAddSimulationStage, onUpdateSimulationStage, onDeleteSimulationStage, onSave, isSaving, syncConfirmed }: { goals: GoalItem[]; averageGoalProgress: number; selectedMonth: string; onSelectedMonthChange: (month: string) => void; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; simulationStages: GoalSimulationStage[]; onAddSimulationStage: () => void; onUpdateSimulationStage: (id: string, field: "name" | "color" | "probability", value: string | number) => void; onDeleteSimulationStage: (id: string) => void; onSave: () => void | Promise<void>; isSaving: boolean; syncConfirmed: boolean }) {
   const daysRemaining = daysUntilMonthEnd();
   const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date(`${selectedMonth}-01T12:00:00`));
   const calendarDays = useMemo(() => {
@@ -1869,13 +1903,13 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
           {goals.length === 0 && <button onClick={onNewGoal} className="flex items-center gap-2 text-sm font-bold text-[#087E5A]"><CirclePlus size={18} />Criar primeiro instrumento</button>}
           <div className="instrument-cell relative isolate overflow-hidden border-[#E5BE6B] bg-[#FFF4D9] shadow-[0_10px_24px_rgba(196,141,35,0.12)]"><div className="pointer-events-none absolute inset-x-5 bottom-4 top-[96px] -z-10 opacity-20"><div className="grid grid-cols-7 gap-x-3 gap-y-2 text-center text-[12px] font-bold text-[#C99D4B]">{["S", "T", "Q", "Q", "S", "S", "D"].map((day, index) => <span key={`weekday-${index}`} className="text-[9px] uppercase tracking-[0.12em] text-[#B78B38]">{day}</span>)}{calendarDays.map((day, index) => <span key={`day-${index}`} className={`rounded-md py-1 ${day === new Date().getDate() && selectedMonth === new Date().toISOString().slice(0, 7) ? "bg-[#E5BE6B] text-[#6B4D12]" : ""}`}>{day ?? ""}</span>)}</div></div><div className="relative z-10"><div className="flex items-center gap-2"><span className="pulse-dot bg-[#C88920]" /><span className="text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#8A651D]">Fechamento do mês</span></div><p className="mt-2 font-display text-[30px] font-extrabold leading-none tracking-[-0.065em] text-[#6B4D12]">{daysRemaining} {daysRemaining === 1 ? "dia útil" : "dias úteis"}</p><p className="mt-1 text-[11px] font-semibold capitalize text-[#8A6D2A]">restantes em {currentMonth}</p></div></div>
         </section>
-        <GoalSimulator stages={simulationStages} onAddStage={onAddSimulationStage} onUpdateStage={onUpdateSimulationStage} onDeleteStage={onDeleteSimulationStage} />
+        <GoalSimulator stages={simulationStages} onAddStage={onAddSimulationStage} onUpdateStage={onUpdateSimulationStage} onDeleteStage={onDeleteSimulationStage} onSave={onSave} isSaving={isSaving} syncConfirmed={syncConfirmed} />
       </div>
     </div>
   );
 }
 
-function GoalSimulator({ stages, onAddStage, onUpdateStage, onDeleteStage }: { stages: GoalSimulationStage[]; onAddStage: () => void; onUpdateStage: (id: string, field: "name" | "color" | "probability", value: string | number) => void; onDeleteStage: (id: string) => void }) {
+function GoalSimulator({ stages, onAddStage, onUpdateStage, onDeleteStage, onSave, isSaving, syncConfirmed }: { stages: GoalSimulationStage[]; onAddStage: () => void; onUpdateStage: (id: string, field: "name" | "color" | "probability", value: string | number) => void; onDeleteStage: (id: string) => void; onSave: () => void | Promise<void>; isSaving: boolean; syncConfirmed: boolean }) {
   const [leadInput, setLeadInput] = useState(120);
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
@@ -1893,7 +1927,7 @@ function GoalSimulator({ stages, onAddStage, onUpdateStage, onDeleteStage }: { s
   return <section className="surface-panel mt-5 overflow-hidden p-4 sm:p-6">
     <div className="flex flex-col gap-4 border-b border-[#E8ECE6] pb-5 lg:flex-row lg:items-end lg:justify-between">
       <div><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#E8F6F0] text-[#087E5A]"><SlidersHorizontal size={16} /></span><p className="eyebrow">Planejamento de volume</p></div><h2 className="mt-2 section-title">Simulador de metas</h2><p className="mt-1 max-w-xl text-sm text-[#718078]">Uma jornada própria para testar cenários, sem alterar as etapas do funil principal.</p></div>
-      <div className="flex flex-wrap items-end gap-3"><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Leads de entrada</span><Input min="0" type="number" value={leadInput} onChange={(event) => setLeadInput(Number(event.target.value))} className="h-10 w-[132px] bg-white font-bold" /></label><Button type="button" onClick={onAddStage} className="h-10 gap-2 rounded-xl bg-[#18201E] px-4 text-xs font-extrabold text-white hover:bg-[#087E5A]"><CirclePlus size={15} />Adicionar etapa</Button></div>
+      <div className="flex flex-wrap items-end gap-3"><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Leads de entrada</span><Input min="0" type="number" value={leadInput} onChange={(event) => setLeadInput(Number(event.target.value))} className="h-10 w-[132px] bg-white font-bold" /></label><Button type="button" onClick={onAddStage} className="h-10 gap-2 rounded-xl bg-[#18201E] px-4 text-xs font-extrabold text-white hover:bg-[#087E5A]"><CirclePlus size={15} />Adicionar etapa</Button><Button type="button" onClick={() => void onSave()} disabled={isSaving} className="h-10 gap-2 rounded-xl bg-[#10A97A] px-4 text-xs font-extrabold text-white hover:bg-[#087E5A] disabled:cursor-wait disabled:opacity-70">{isSaving ? <RotateCcw className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCheck size={15} />}{isSaving ? "Salvando..." : "Salvar metas"}</Button><span className={`inline-flex h-10 items-center rounded-xl border px-3 text-[10px] font-extrabold uppercase tracking-[0.08em] ${syncConfirmed ? "border-[#CBE5D7] bg-[#F0F8F3] text-[#087E5A]" : "border-[#E7D5A8] bg-[#FFF9E8] text-[#80621D]"}`}>{syncConfirmed ? "Sincronizado com Supabase" : "Alterações não salvas"}</span></div>
     </div>
     <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
       <div><div className="space-y-2">{stages.map((stage, index) => { const projection = index === 0 ? { rate: 100, projected: leads } : projectionByStage.get(stage.id); const isEditing = editingStageId === stage.id; return <div key={stage.id} className="rounded-xl border border-[#E7EBE6] bg-[#FCFCFA] px-3 py-2.5"><div className="flex items-center gap-2.5"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} />{isEditing ? <Input autoFocus value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveName(stage); if (event.key === "Escape") setEditingStageId(null); }} className="h-8 min-w-0 flex-1 bg-white text-sm font-bold" /> : <p className="min-w-0 flex-1 truncate text-sm font-bold text-[#35403B]">{stage.name}</p>}<button type="button" onClick={() => isEditing ? saveName(stage) : startEditing(stage)} className="grid h-8 w-8 place-items-center rounded-lg text-[#718078] hover:bg-[#E8F6F0] hover:text-[#087E5A]" title={isEditing ? "Salvar nome" : "Editar etapa"} aria-label={isEditing ? `Salvar nome de ${stage.name}` : `Editar ${stage.name}`}>{isEditing ? <CheckCircle2 size={15} /> : <Pencil size={15} />}</button>{isEditing && <button type="button" onClick={() => setEditingStageId(null)} className="grid h-8 w-8 place-items-center rounded-lg text-[#718078] hover:bg-[#F6EAE8] hover:text-[#B44D46]" title="Cancelar edição" aria-label="Cancelar edição"><X size={15} /></button>}<button type="button" onClick={() => onDeleteStage(stage.id)} disabled={stages.length <= 2} className="grid h-8 w-8 place-items-center rounded-lg text-[#9C6D69] hover:bg-[#F6EAE8] hover:text-[#B44D46] disabled:cursor-not-allowed disabled:opacity-30" title={stages.length <= 2 ? "Mantenha pelo menos duas etapas" : "Excluir etapa"} aria-label={`Excluir ${stage.name}`}><Trash2 size={15} /></button></div><div className="mt-2 flex items-center gap-3 pl-5"><label className="flex items-center gap-2 text-[11px] font-semibold text-[#7A8981]"><span>Cor</span><input type="color" value={stage.color} onChange={(event) => onUpdateStage(stage.id, "color", event.target.value)} className="h-7 w-9 cursor-pointer rounded-md border border-[#DDE5DE] bg-white p-0.5" aria-label={`Cor de ${stage.name}`} /></label><label className="relative ml-auto w-[92px]"><span className="sr-only">Taxa para {stage.name}</span><Input min="0" max="100" step="0.1" type="number" value={index === 0 ? 100 : stage.probability} disabled={index === 0} onChange={(event) => onUpdateStage(stage.id, "probability", event.target.value)} className="h-9 bg-white pr-7 text-right font-extrabold disabled:bg-[#F0F4F0] disabled:text-[#087E5A]" /><span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7C8A83]">%</span></label><span className="text-[11px] text-[#8A9690]">{index === 0 ? "Base" : `${stage.probability}% da etapa anterior`}</span></div></div>; })}</div><p className="mt-3 text-[11px] leading-5 text-[#88958E]">A primeira etapa é a entrada e permanece em 100%. As taxas seguintes são editáveis e ficam salvas apenas nesta simulação.</p></div>

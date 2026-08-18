@@ -189,6 +189,61 @@ export async function syncService(workspaceId: string, service: any) {
   return { ok: true as const, id: row.id };
 }
 
+export async function syncGoalsWorkspace(workspaceId: string, goals: any[], goalSimulationStages: any[]) {
+  const supabase = getAdminClient();
+  const goalRows = goals.map((goal: any, position: number) => ({
+    id: entityUuid(goal.id, "goal"),
+    workspace_id: workspaceId,
+    title: String(goal.title ?? "").trim() || "Nova meta",
+    goal_type: goal.type,
+    target: Math.max(0, Number(goal.target) || 0),
+    actual: Math.max(0, Number(goal.actual) || 0),
+    unit: goal.unit,
+    period: goal.period,
+    color: goal.color,
+    recurring: Boolean(goal.recurring),
+    monthly_overrides: goal.monthlyOverrides ?? {},
+    linked_funnel_id: mapGoalReference(goal.linkedFunnelId, "funnel"),
+    linked_stage_id: mapGoalReference(goal.linkedStageId, "stage"),
+    position,
+  }));
+  const { data: existingGoals, error: existingGoalsError } = await supabase.from("goals").select("id").eq("workspace_id", workspaceId);
+  if (existingGoalsError) throw existingGoalsError;
+  const goalIds = goalRows.map((row: any) => row.id);
+  const staleGoalIds = (existingGoals ?? []).map((row: any) => row.id).filter((id: string) => !goalIds.includes(id));
+  if (staleGoalIds.length) {
+    const result = await supabase.from("goals").delete().in("id", staleGoalIds);
+    if (result.error) throw result.error;
+  }
+  if (goalRows.length) {
+    const result = await supabase.from("goals").upsert(goalRows);
+    if (result.error) throw result.error;
+  }
+
+  const { data: existingGoalSimulationStages, error: goalSimulationStagesReadError } = await supabase.from("goal_simulation_stages").select("id").eq("workspace_id", workspaceId);
+  if (goalSimulationStagesReadError) throw goalSimulationStagesReadError;
+  const goalSimulationStageRows = goalSimulationStages.map((stage: any, position: number) => ({
+    id: entityUuid(stage.id, "goal-simulation-stage"),
+    workspace_id: workspaceId,
+    name: String(stage.name ?? "Nova etapa").trim() || "Nova etapa",
+    color: stage.color,
+    probability: Math.min(100, Math.max(0, Number(stage.probability) || 0)),
+    position,
+    updated_at: new Date().toISOString(),
+  }));
+  const goalSimulationStageIds = goalSimulationStageRows.map((row: any) => row.id);
+  const staleGoalSimulationStages = (existingGoalSimulationStages ?? []).map((row: any) => row.id).filter((id: string) => !goalSimulationStageIds.includes(id));
+  if (staleGoalSimulationStages.length) {
+    const result = await supabase.from("goal_simulation_stages").delete().in("id", staleGoalSimulationStages);
+    if (result.error) throw result.error;
+  }
+  if (goalSimulationStageRows.length) {
+    const result = await supabase.from("goal_simulation_stages").upsert(goalSimulationStageRows);
+    if (result.error) throw result.error;
+  }
+  return { ok: true as const };
+}
+
 export async function syncWorkspaceSnapshot(workspaceId: string, state: any) {
   const supabase = getAdminClient();
   const goals = Array.isArray(state.goals) ? state.goals : [];
