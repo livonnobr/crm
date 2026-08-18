@@ -67,6 +67,7 @@ import { cleanGoalPeriod, goalPeriodInputType, goalPeriodInputValue, goalPeriodV
 import { businessDaysUntilMonthEnd } from "@/lib/business-days";
 import { persistenceActionLabel, persistenceLabel } from "@/lib/persistence-status";
 import { projectFunnelStages, reorderFunnelStages } from "@/lib/funnel-utils";
+import { snapshotHasPersistedData } from "@/lib/workspace-hydration";
 import { trpc } from "@/lib/trpc";
 
 type Page = "goals" | "pipeline" | "activities" | "people" | "prospecting" | "cadence" | "finance";
@@ -629,6 +630,13 @@ export default function Home() {
 
     if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError || cadenceBlocksError || financeError) {
       toast.error("Não foi possível carregar os dados salvos.");
+      setIsCloudLoading(false);
+      setIsCloudHydrating(false);
+      return;
+    }
+
+    if (remoteSnapshot && !snapshotHasPersistedData(remoteSnapshot)) {
+      setWorkspaceId(currentWorkspaceId);
       setIsCloudLoading(false);
       setIsCloudHydrating(false);
       return;

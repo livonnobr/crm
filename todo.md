@@ -373,3 +373,7 @@
 
 - [x] Permitir arrastar e soltar para reorganizar as etapas do funil, persistindo a nova ordem
 - [x] Ignorar a primeira etapa do funil na projeção do simulador de metas
+
+- [ ] Corrigir leitura e gravação autenticadas de Funis, Negócios, Empresas e Metas no workspace do usuário Supabase
+- [ ] Validar diretamente no crmsupa que os quatro módulos carregam e persistem registros reais após o login
+- [x] Impedir que um snapshot Supabase vazio substitua os dados locais antes da primeira sincronização autenticada
