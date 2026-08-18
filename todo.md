@@ -361,3 +361,8 @@
 - [x] Reduzir e reposicionar as informações superiores do card Fechamento do mês para não sobrepor o calendário
 
 - [x] Remover o redirecionamento obrigatório para login Manus e usar automaticamente o workspace Supabase configurado do proprietário
+
+- [x] Verificar e republicar na Vercel oficial o commit 28b0531 para remover o login Manus do domínio de produção
+
+- [x] Criar login próprio do Ritmo integrado ao Supabase, com dados isolados por usuário/workspace
+- [x] Remover da aba Empresas todos os botões e textos explícitos de “Salvar no Supabase”, mantendo salvamento automático

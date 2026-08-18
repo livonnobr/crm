@@ -31,7 +31,7 @@ export async function ensureWorkspaceForOwner(owner: {
     const created = await supabase.auth.admin.createUser({
       email,
       email_confirm: true,
-      user_metadata: { name: owner.name ?? (ENV.ownerOpenId || email), source: "ritmo-owner-workspace" },
+      user_metadata: { name: owner.name ?? ENV.ownerOpenId ?? email, source: "ritmo-owner-workspace" },
     });
     if (created.error) throw created.error;
     authUser = created.data.user;
@@ -57,6 +57,39 @@ export async function ensureWorkspaceForOwner(owner: {
   return { workspaceId: createdWorkspace.data.id, ownerId: authUser.id };
 }
 
+
+export function extractSupabaseBearerToken(authorization?: string | null) {
+  return authorization?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
+}
+
+export async function ensureWorkspaceForSupabaseToken(authorization?: string | null) {
+  const token = extractSupabaseBearerToken(authorization);
+  if (!token) throw new Error("Sessão Supabase ausente.");
+
+  const supabase = getAdminClient();
+  const authenticated = await supabase.auth.getUser(token);
+  if (authenticated.error) throw authenticated.error;
+  const authUser = authenticated.data.user;
+  if (!authUser) throw new Error("Usuário Supabase inválido.");
+
+  const existing = await supabase
+    .from("workspaces")
+    .select("id")
+    .eq("owner_id", authUser.id)
+    .limit(1)
+    .maybeSingle();
+  if (existing.error) throw existing.error;
+  if (existing.data?.id) return { workspaceId: existing.data.id, ownerId: authUser.id, email: authUser.email ?? null };
+
+  const createdWorkspace = await supabase
+    .from("workspaces")
+    .insert({ owner_id: authUser.id, name: "Ritmo CRM" })
+    .select("id")
+    .single();
+  if (createdWorkspace.error) throw createdWorkspace.error;
+
+  return { workspaceId: createdWorkspace.data.id, ownerId: authUser.id, email: authUser.email ?? null };
+}
 
 export async function getWorkspaceSnapshot(workspaceId: string) {
   const supabase = getAdminClient();
