@@ -355,3 +355,5 @@
 - [x] Restringir o snapshot server-side de Empresas aos registros das listas do workspace autenticado
 
 - [x] Usar as conexões já configuradas para resolver automaticamente o workspace do proprietário na Vercel, sem exigir conexão manual do Supabase
+
+- [ ] Corrigir TypeError Invalid URL ao abrir a aba Empresas diretamente por `?aba=prospeccao` na produção Vercel
