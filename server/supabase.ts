@@ -107,6 +107,7 @@ export async function getWorkspaceSnapshot(workspaceId: string) {
     { data: prospectRecords, error: prospectRecordsError },
     { data: cadenceBlocks, error: cadenceError },
     { data: financeEntries, error: financeError },
+    { data: services, error: servicesError },
   ] = await Promise.all([
     supabase.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, monthly_overrides, position, linked_funnel_id, linked_stage_id").eq("workspace_id", workspaceId).order("position", { ascending: true }),
     supabase.from("funnels").select("id, name, currency, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
@@ -116,8 +117,9 @@ export async function getWorkspaceSnapshot(workspaceId: string) {
       : Promise.resolve({ data: [], error: null }),
     supabase.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
     supabase.from("finance_entries").select("id, workspace_id, expense, amount, installment, due_date, notes, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
+    supabase.from("services").select("id, workspace_id, name, deliverables, deadline, deadline_unit, price, pricing_type, position").eq("workspace_id", workspaceId).order("position", { ascending: true }),
   ]);
-  const error = goalsError ?? funnelsError ?? conversionError ?? prospectListsError ?? prospectRecordsError ?? cadenceError ?? financeError;
+  const error = goalsError ?? funnelsError ?? conversionError ?? prospectListsError ?? prospectRecordsError ?? cadenceError ?? financeError ?? servicesError;
   if (error) throw error;
   const funnelIds = (funnels ?? []).map((funnel) => funnel.id);
   const [{ data: stages, error: stagesError }, { data: opportunities, error: opportunitiesError }] = funnelIds.length
@@ -127,7 +129,7 @@ export async function getWorkspaceSnapshot(workspaceId: string) {
       ])
     : [{ data: [], error: null }, { data: [], error: null }];
   if (stagesError || opportunitiesError) throw stagesError ?? opportunitiesError;
-  return { goals: goals ?? [], funnels: funnels ?? [], stages: stages ?? [], opportunities: opportunities ?? [], conversionSettings: conversionSettings ?? null, prospectLists: prospectLists ?? [], prospectRecords: prospectRecords ?? [], cadenceBlocks: cadenceBlocks ?? [], financeEntries: financeEntries ?? [] };
+  return { goals: goals ?? [], funnels: funnels ?? [], stages: stages ?? [], opportunities: opportunities ?? [], conversionSettings: conversionSettings ?? null, prospectLists: prospectLists ?? [], prospectRecords: prospectRecords ?? [], cadenceBlocks: cadenceBlocks ?? [], financeEntries: financeEntries ?? [], services: services ?? [] };
 }
 
 
@@ -140,6 +142,7 @@ export async function syncWorkspaceSnapshot(workspaceId: string, state: any) {
   const trashedProspectLists = Array.isArray(state.trashedProspectLists) ? state.trashedProspectLists : [];
   const cadenceBlocks = Array.isArray(state.cadenceBlocks) ? state.cadenceBlocks : [];
   const financeEntries = Array.isArray(state.financeEntries) ? state.financeEntries : [];
+  const services = Array.isArray(state.services) ? state.services : [];
   const stageToFunnel = new Map(funnels.flatMap((funnel: any) => (funnel.stages ?? []).map((stage: any) => [stage.id, funnel.id])));
   const funnelIds = funnels.map((funnel: any) => funnel.id);
   const goalRows = goals.map((goal: any, position: number) => ({ id: goal.id, workspace_id: workspaceId, title: goal.title, goal_type: goal.type, target: goal.target, actual: goal.actual, unit: goal.unit, period: goal.period, color: goal.color, recurring: Boolean(goal.recurring), monthly_overrides: goal.monthlyOverrides ?? {}, linked_funnel_id: goal.linkedFunnelId || null, linked_stage_id: goal.linkedStageId || null, position }));
@@ -170,5 +173,6 @@ export async function syncWorkspaceSnapshot(workspaceId: string, state: any) {
   if (recordRows.length) { const { error } = await supabase.from("prospect_records").upsert(recordRows); if (error) throw error; }
   const { data: existingCadence, error: cadenceReadError } = await supabase.from("cadence_blocks").select("id").eq("workspace_id", workspaceId); if (cadenceReadError) throw cadenceReadError; const cadenceIds = cadenceBlocks.map((block: any) => block.id); const staleCadence = (existingCadence ?? []).map((row: any) => row.id).filter((id: string) => !cadenceIds.includes(id)); if (staleCadence.length) { const result = await supabase.from("cadence_blocks").delete().in("id", staleCadence); if (result.error) throw result.error; } if (cadenceBlocks.length) { const result = await supabase.from("cadence_blocks").upsert(cadenceBlocks.map((block: any, position: number) => ({ id: block.id, workspace_id: workspaceId, day: block.day, slot: block.slot, title: block.title, channel: block.channel, notes: block.notes, position, updated_at: new Date().toISOString() }))); if (result.error) throw result.error; }
   const { data: existingFinance, error: financeReadError } = await supabase.from("finance_entries").select("id").eq("workspace_id", workspaceId); if (financeReadError) throw financeReadError; const financeIds = financeEntries.map((entry: any) => entry.id); const staleFinance = (existingFinance ?? []).map((row: any) => row.id).filter((id: string) => !financeIds.includes(id)); if (staleFinance.length) { const result = await supabase.from("finance_entries").delete().in("id", staleFinance); if (result.error) throw result.error; } if (financeEntries.length) { const result = await supabase.from("finance_entries").upsert(financeEntries.map((entry: any, position: number) => ({ id: entry.id, workspace_id: workspaceId, expense: entry.expense, amount: entry.amount, installment: entry.installment, due_date: entry.dueDate || null, notes: entry.notes, position, updated_at: new Date().toISOString() }))); if (result.error) throw result.error; }
+  const { data: existingServices, error: servicesReadError } = await supabase.from("services").select("id").eq("workspace_id", workspaceId); if (servicesReadError) throw servicesReadError; const serviceIds = services.map((service: any) => service.id); const staleServices = (existingServices ?? []).map((row: any) => row.id).filter((id: string) => !serviceIds.includes(id)); if (staleServices.length) { const result = await supabase.from("services").delete().in("id", staleServices); if (result.error) throw result.error; } if (services.length) { const result = await supabase.from("services").upsert(services.map((service: any, position: number) => ({ id: service.id, workspace_id: workspaceId, name: service.name, deliverables: service.deliverables ?? "", deadline: service.deadline, deadline_unit: service.deadlineUnit, price: service.price, pricing_type: service.pricingType, position, updated_at: new Date().toISOString() }))); if (result.error) throw result.error; }
   return { ok: true as const };
 }

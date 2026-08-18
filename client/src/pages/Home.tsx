@@ -70,7 +70,20 @@ import { projectFunnelStages, reorderFunnelStages } from "@/lib/funnel-utils";
 import { snapshotHasPersistedData } from "@/lib/workspace-hydration";
 import { trpc } from "@/lib/trpc";
 
-type Page = "goals" | "pipeline" | "activities" | "people" | "prospecting" | "cadence" | "finance";
+type Page = "goals" | "pipeline" | "activities" | "people" | "prospecting" | "cadence" | "finance" | "services";
+
+type ServicePricingType = "Fixo" | "Mensal" | "A partir de";
+type ServiceDeadlineUnit = "dias" | "semanas" | "meses";
+
+type Service = {
+  id: string;
+  name: string;
+  deliverables: string;
+  deadline: number;
+  deadlineUnit: ServiceDeadlineUnit;
+  price: number;
+  pricingType: ServicePricingType;
+};
 
 type FinanceEntry = {
   id: string;
@@ -89,6 +102,18 @@ type FinanceEntryRow = {
   installment: string;
   due_date: string | null;
   notes: string;
+  position: number;
+};
+
+type ServiceRow = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  deliverables: string;
+  deadline: number | string;
+  deadline_unit: ServiceDeadlineUnit;
+  price: number | string;
+  pricing_type: ServicePricingType;
   position: number;
 };
 
@@ -557,7 +582,7 @@ export default function Home() {
 
   const [page, setPage] = useState<Page>(() => {
     const tab = new URLSearchParams(window.location.search).get("aba");
-    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : tab === "cadencia" ? "cadence" : tab === "prospeccao" ? "prospecting" : tab === "financeiro" ? "finance" : "goals";
+    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : tab === "cadencia" ? "cadence" : tab === "prospeccao" ? "prospecting" : tab === "financeiro" ? "finance" : tab === "servicos" ? "services" : "goals";
   });
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [isSidebarHovering, setIsSidebarHovering] = useState(false);
@@ -570,6 +595,7 @@ export default function Home() {
   const [trashedProspectLists, setTrashedProspectLists] = useState<TrashedProspectList[]>(() => storedTrashedProspectLists());
   const [cadenceBlocks, setCadenceBlocks] = useState<CadenceBlock[]>(() => storedValue("ritmo-cadence-blocks", initialCadenceBlocks));
   const [financeEntries, setFinanceEntries] = useState<FinanceEntry[]>(() => storedValue("ritmo-finance-entries", []));
+  const [services, setServices] = useState<Service[]>(() => storedValue("ritmo-services", []));
   const [draggedCadenceId, setDraggedCadenceId] = useState<string | null>(null);
   const [cadenceEditId, setCadenceEditId] = useState<string | null>(null);
   const [activeProspectListId, setActiveProspectListId] = useState(() => storedValue("ritmo-active-prospect-list", "prospect-list-default"));
@@ -610,7 +636,7 @@ export default function Home() {
     setIsCloudLoading(true);
     const client = getSupabaseClient();
     const remoteSnapshot = workspaceSnapshot.data?.snapshot;
-    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }, { data: financeRows, error: financeError }] = remoteSnapshot
+    const [{ data: goalRows, error: goalsError }, { data: funnelRows, error: funnelsError }, { data: conversionSettingsRow, error: conversionSettingsError }, { data: prospectListRows, error: prospectListsError }, { data: prospectRecordRows, error: prospectRecordsError }, { data: cadenceBlockRows, error: cadenceBlocksError }, { data: financeRows, error: financeError }, { data: serviceRows, error: servicesError }] = remoteSnapshot
       ? [
           { data: remoteSnapshot.goals, error: null },
           { data: remoteSnapshot.funnels, error: null },
@@ -619,6 +645,7 @@ export default function Home() {
           { data: remoteSnapshot.prospectRecords, error: null },
           { data: remoteSnapshot.cadenceBlocks, error: null },
           { data: remoteSnapshot.financeEntries, error: null },
+          { data: remoteSnapshot.services, error: null },
         ]
       : await Promise.all([
           client.from("goals").select("id, title, goal_type, target, actual, unit, period, color, recurring, position, linked_funnel_id, linked_stage_id").eq("workspace_id", currentWorkspaceId).order("position", { ascending: true }),
@@ -628,9 +655,10 @@ export default function Home() {
           client.from("prospect_records").select("id, list_id, decision_maker_first_name, decision_maker_last_name, decision_maker_role, decision_maker_email, decision_maker_phone, decision_maker_secondary_phone, monthly_visits, company, company_website, analysis, position").order("position"),
           client.from("cadence_blocks").select("id, workspace_id, day, slot, title, channel, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
           client.from("finance_entries").select("id, workspace_id, expense, amount, installment, due_date, notes, position").eq("workspace_id", currentWorkspaceId).order("position"),
+          client.from("services").select("id, workspace_id, name, deliverables, deadline, deadline_unit, price, pricing_type, position").eq("workspace_id", currentWorkspaceId).order("position"),
         ]);
 
-    if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError || cadenceBlocksError || financeError) {
+    if (goalsError || funnelsError || conversionSettingsError || prospectListsError || prospectRecordsError || cadenceBlocksError || financeError || servicesError) {
       toast.error("Não foi possível carregar os dados salvos.");
       setIsCloudLoading(false);
       setIsCloudHydrating(false);
@@ -675,6 +703,7 @@ export default function Home() {
 
     const normalizedCadenceBlocks = ((cadenceBlockRows ?? []) as CadenceBlockRow[]).map((block) => ({ id: block.id, day: Number(block.day), slot: block.slot, title: block.title, channel: block.channel, notes: block.notes }));
     const normalizedFinanceEntries = ((financeRows ?? []) as FinanceEntryRow[]).map((entry) => ({ id: entry.id, expense: entry.expense, amount: Number(entry.amount), installment: entry.installment, dueDate: entry.due_date ?? "", notes: entry.notes }));
+    const normalizedServices = ((serviceRows ?? []) as ServiceRow[]).map((service) => ({ id: service.id, name: service.name, deliverables: service.deliverables, deadline: Number(service.deadline), deadlineUnit: service.deadline_unit, price: Number(service.price), pricingType: service.pricing_type }));
 
     const normalizedGoals = ((goalRows ?? []) as GoalRecord[]).map((goal) => ({
       id: goal.id,
@@ -725,6 +754,7 @@ export default function Home() {
     setDeals(normalizedDeals);
     setCadenceBlocks(normalizedCadenceBlocks.length ? normalizedCadenceBlocks : initialCadenceBlocks);
     setFinanceEntries(normalizedFinanceEntries);
+    setServices(normalizedServices);
     setProspectLists(normalizedProspectLists.length ? normalizedProspectLists : initialProspectLists);
     setTrashedProspectLists(normalizedProspectTrash);
     setActiveProspectListId(normalizedProspectLists[0]?.id ?? initialProspectLists[0].id);
@@ -773,8 +803,9 @@ export default function Home() {
       window.localStorage.setItem("ritmo-active-prospect-list", activeProspectListId);
       window.localStorage.setItem("ritmo-cadence-blocks", JSON.stringify(cadenceBlocks));
       window.localStorage.setItem("ritmo-finance-entries", JSON.stringify(financeEntries));
+      window.localStorage.setItem("ritmo-services", JSON.stringify(services));
     }
-  }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, financeEntries, workspaceId]);
+  }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, financeEntries, services, workspaceId]);
 
   async function syncCurrentWorkspace() {
     if (!workspaceId) throw new Error("Workspace Supabase indisponível.");
@@ -789,6 +820,7 @@ export default function Home() {
       trashedProspectLists,
       cadenceBlocks,
       financeEntries,
+      services,
     } });
     if (syncAttemptRef.current === attempt) setIsSyncConfirmed(true);
   }
@@ -797,7 +829,7 @@ export default function Home() {
     if (!workspaceId || isCloudHydrating) return;
     void syncCurrentWorkspace().catch(() => toast.error("Não foi possível sincronizar os dados com o Supabase."));
     return;
-  }, [goals, funnels, deals, conversionRates, prospectLists, trashedProspectLists, cadenceBlocks, financeEntries, workspaceId, isCloudHydrating]);
+  }, [goals, funnels, deals, conversionRates, prospectLists, trashedProspectLists, cadenceBlocks, financeEntries, services, workspaceId, isCloudHydrating]);
 
   const activeFunnel = funnels.find((funnel) => funnel.id === activeFunnelId) ?? funnels[0];
   const funnelDeals = useMemo(
@@ -827,7 +859,7 @@ export default function Home() {
     setPage(nextPage);
     const url = new URL(window.location.href);
     if (nextPage === "goals") url.searchParams.delete("aba");
-    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : nextPage === "people" ? "pessoas" : nextPage === "cadence" ? "cadencia" : nextPage === "finance" ? "financeiro" : "prospeccao");
+    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : nextPage === "people" ? "pessoas" : nextPage === "cadence" ? "cadencia" : nextPage === "finance" ? "financeiro" : nextPage === "services" ? "servicos" : "prospeccao");
     window.history.replaceState({}, "", url);
   }
 
@@ -843,6 +875,19 @@ export default function Home() {
   function deleteFinanceEntry(id: string) {
     setFinanceEntries((current) => current.filter((entry) => entry.id !== id));
     toast.success("Lançamento removido.");
+  }
+  function addService() {
+    const nextService: Service = { id: uniqueId("service"), name: "Novo serviço", deliverables: "Descreva os entregáveis", deadline: 7, deadlineUnit: "dias", price: 0, pricingType: "Fixo" };
+    setServices((current) => [nextService, ...current]);
+    setPage("services");
+    toast.success("Serviço adicionado.");
+  }
+  function updateService(id: string, field: keyof Omit<Service, "id">, value: string | number) {
+    setServices((current) => current.map((service) => service.id === id ? { ...service, [field]: field === "deadline" || field === "price" ? Number(value) || 0 : value } : service));
+  }
+  function deleteService(id: string) {
+    setServices((current) => current.filter((service) => service.id !== id));
+    toast.success("Serviço removido.");
   }
   function addCadenceBlock(day: number, slot: CadenceSlot, details?: Pick<CadenceBlock, "title" | "channel" | "notes">) {
     if (cadenceBlocks.some((block) => block.day === day && block.slot === slot)) { toast.info("Essa célula já tem uma ação."); return; }
@@ -1437,6 +1482,7 @@ export default function Home() {
             <SidebarItem icon={<ClipboardList size={19} />} label="Empresas" active={page === "prospecting"} onClick={() => selectPage("prospecting")} />
             <SidebarItem icon={<GitBranch size={19} />} label="Cadência" active={page === "cadence"} onClick={() => selectPage("cadence")} />
             <SidebarItem icon={<CircleDollarSign size={19} />} label="Financeiro" active={page === "finance"} onClick={() => selectPage("finance")} />
+            <SidebarItem icon={<BriefcaseBusiness size={19} />} label="Serviços" active={page === "services"} onClick={() => selectPage("services")} />
           </SidebarMenu>
         </SidebarGroup>
 
@@ -1484,7 +1530,7 @@ export default function Home() {
           <img className="h-8 w-8 rounded-lg" src={logoUrl} alt="" />
           <span className="font-display text-lg font-extrabold tracking-[-0.06em]">ritmo</span>
         </div>
-        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" || page === "people" ? addProspect : page === "cadence" ? () => addCadenceBlock(1, "morning") : page === "finance" ? addFinanceEntry : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
+        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" || page === "people" ? addProspect : page === "cadence" ? () => addCadenceBlock(1, "morning") : page === "finance" ? addFinanceEntry : page === "services" ? addService : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
           <Plus className="h-5 w-5" />
         </button>
       </div>
@@ -1548,6 +1594,8 @@ export default function Home() {
           <CadenceWorkspace blocks={cadenceBlocks} onAdd={addCadenceBlock} onMove={moveCadenceBlock} onEdit={editCadenceBlock} onDelete={deleteCadenceBlock} />
         ) : page === "finance" ? (
           <FinanceWorkspace entries={financeEntries} onAdd={addFinanceEntry} onUpdate={updateFinanceEntry} onDelete={deleteFinanceEntry} />
+        ) : page === "services" ? (
+          <ServicesWorkspace services={services} onAdd={addService} onUpdate={updateService} onDelete={deleteService} />
         ) : (
           <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} funnels={funnels} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} onImportList={importProspectList} onSave={saveProspectsToCloud} onSaveProspect={saveProspectToCloud} isSaving={isProspectSaving} savingProspectId={savingProspectId} syncConfirmed={isSyncConfirmed} onConnect={() => setAuthDialogOpen(true)} />
         )}
@@ -2010,6 +2058,24 @@ function FinanceWorkspace({ entries, onAdd, onUpdate, onDelete }: { entries: Fin
     </div>
     <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Total lançado</p><p className="mt-2 text-2xl font-bold text-[#087E5A]">{formatCurrency(total)}</p><p className="mt-1 text-xs text-[#8A958F]">{count} {count === 1 ? "despesa" : "despesas"}</p></div><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Próximo vencimento</p><p className="mt-2 text-base font-bold text-[#27302D]">{nextDue?.expense || "Nenhum lançamento"}</p><p className="mt-1 text-xs text-[#8A958F]">{daysRemaining === null ? "Cadastre uma data" : daysRemaining < 0 ? `Vencido há ${Math.abs(daysRemaining)} dias` : `${daysRemaining} dias restantes`}</p></div><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Período</p><p className="mt-2 text-base font-bold text-[#27302D]">Visão atual</p><p className="mt-1 text-xs text-[#8A958F]">Atualização automática dos valores</p></div></div>
     <div className="overflow-hidden rounded-[26px] border border-[#E3E9E3] bg-[#FCFCFA] shadow-[0_12px_32px_rgba(30,55,44,0.04)]"><div className="flex items-center justify-between border-b border-[#E7EBE6] px-5 py-4"><div><p className="eyebrow">Lançamentos</p><h2 className="font-display text-lg font-bold text-[#27302D]">Despesas e compromissos</h2></div><span className="rounded-full bg-[#E7F5EF] px-3 py-1 text-xs font-bold text-[#087E5A]">{formatCurrency(total)}</span></div><div className="overflow-x-auto"><table className="min-w-[780px] w-full text-left"><thead className="bg-[#F1F5F0] text-[10px] uppercase tracking-[0.14em] text-[#6F7D75]"><tr><th className="px-4 py-3">Despesa</th><th className="px-4 py-3">Valor</th><th className="px-4 py-3">Parcela</th><th className="px-4 py-3">Data</th><th className="px-4 py-3">Faltam</th><th className="px-4 py-3"></th></tr></thead><tbody>{entries.map((entry) => { const remaining = entry.dueDate ? Math.round((new Date(`${entry.dueDate}T00:00:00`).getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000) : null; return <tr key={entry.id} className="border-t border-[#EDF0EC] align-top"><td className="px-4 py-3"><Input value={entry.expense} onChange={(event) => onUpdate(entry.id, "expense", event.target.value)} placeholder="Ex.: Aluguel" className="min-w-[190px] bg-white" /></td><td className="px-4 py-3"><Input type="number" min="0" step="0.01" value={entry.amount} onChange={(event) => onUpdate(entry.id, "amount", Number(event.target.value))} className="w-[130px] bg-white" /></td><td className="px-4 py-3"><Input value={entry.installment} onChange={(event) => onUpdate(entry.id, "installment", event.target.value)} placeholder="Parcela 1 de 12" className="min-w-[150px] bg-white" /></td><td className="px-4 py-3"><Input type="date" value={entry.dueDate} onChange={(event) => onUpdate(entry.id, "dueDate", event.target.value)} className="w-[150px] bg-white" /></td><td className="px-4 py-3 text-sm font-semibold text-[#087E5A]">{remaining === null ? "—" : remaining < 0 ? `-${Math.abs(remaining)}d` : `${remaining}d`}</td><td className="px-4 py-3"><button onClick={() => onDelete(entry.id)} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${entry.expense || "lançamento"}`}><Trash2 size={15} /></button></td></tr> })}</tbody></table>{!entries.length && <div className="px-5 py-12 text-center text-sm text-[#7D8983]">Nenhum lançamento ainda. Adicione a primeira despesa para começar.</div>}</div></div>
+  </div>;
+}
+
+function ServicesWorkspace({ services, onAdd, onUpdate, onDelete }: { services: Service[]; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<Service, "id">, value: string | number) => void; onDelete: (id: string) => void }) {
+  const totalValue = services.reduce((sum, service) => sum + service.price, 0);
+  const monthlyValue = services.filter((service) => service.pricingType === "Mensal").reduce((sum, service) => sum + service.price, 0);
+  const averageDeadline = services.length ? Math.round(services.reduce((sum, service) => sum + service.deadline, 0) / services.length) : 0;
+
+  return <div className="grid gap-5 pb-8">
+    <div className="flex flex-col gap-4 rounded-[26px] border border-[#E3E9E3] bg-[#FCFCFA] p-5 shadow-[0_12px_32px_rgba(30,55,44,0.04)] sm:flex-row sm:items-end sm:justify-between">
+      <div><p className="eyebrow">Catálogo comercial</p><h1 className="font-display text-3xl font-bold tracking-[-0.04em] text-[#27302D]">Serviços<span className="text-[#10A97A]">.</span></h1><p className="mt-2 max-w-xl text-sm text-[#77847D]">Cadastre o que você entrega, em quanto tempo e por qual valor para ter uma referência comercial sempre pronta.</p></div>
+      <Button onClick={onAdd} className="w-full bg-[#10A97A] text-white hover:bg-[#087E5A] sm:w-auto"><Plus size={16} /> Novo serviço</Button>
+    </div>
+    <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Valor do catálogo</p><p className="mt-2 text-2xl font-bold text-[#087E5A]">{formatCurrency(totalValue)}</p><p className="mt-1 text-xs text-[#8A958F]">{services.length} {services.length === 1 ? "serviço cadastrado" : "serviços cadastrados"}</p></div><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Receita mensal</p><p className="mt-2 text-2xl font-bold text-[#27302D]">{formatCurrency(monthlyValue)}</p><p className="mt-1 text-xs text-[#8A958F]">Serviços com cobrança recorrente</p></div><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Prazo médio</p><p className="mt-2 text-2xl font-bold text-[#27302D]">{averageDeadline || "—"}<span className="ml-1 text-sm font-semibold text-[#8A958F]">{averageDeadline ? "unid." : "Cadastre um prazo"}</span></p><p className="mt-1 text-xs text-[#8A958F]">Referência entre os serviços</p></div></div>
+    <div className="rounded-[26px] border border-[#E3E9E3] bg-[#FCFCFA] p-5 shadow-[0_12px_32px_rgba(30,55,44,0.04)] sm:p-6">
+      <div className="flex flex-col gap-2 border-b border-[#E7EBE6] pb-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="eyebrow">Itens do catálogo</p><h2 className="font-display text-lg font-bold text-[#27302D]">Oferta pronta para apresentar</h2></div><span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#E7F5EF] px-3 py-1 text-xs font-bold text-[#087E5A]"><BriefcaseBusiness size={13} />{services.length} {services.length === 1 ? "item" : "itens"}</span></div>
+      {services.length ? <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{services.map((service) => <article key={service.id} className="rounded-2xl border border-[#E3E9E3] bg-[#FBFCFA] p-4 transition hover:border-[#B8DCCB] hover:shadow-[0_10px_24px_rgba(30,55,44,0.06)]"><div className="mb-3 flex items-center justify-between gap-2"><span className="tag-chip bg-[#E8F6F0] text-[#087E5A]">{service.pricingType}</span><button onClick={() => onDelete(service.id)} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${service.name || "serviço"}`}><Trash2 size={15} /></button></div><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Nome do serviço</span><Input value={service.name} onChange={(event) => onUpdate(service.id, "name", event.target.value)} placeholder="Ex.: Consultoria comercial" className="bg-white font-bold" /></label><label className="mt-4 block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Entregáveis</span><textarea value={service.deliverables} onChange={(event) => onUpdate(service.id, "deliverables", event.target.value)} placeholder="Liste os materiais, etapas ou resultados incluídos" rows={4} className="form-textarea w-full resize-y bg-white text-sm" /></label><div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3"><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Prazo</span><Input type="number" min="1" max="3650" value={service.deadline} onChange={(event) => onUpdate(service.id, "deadline", Number(event.target.value))} className="bg-white" /></label><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Unidade</span><select className="form-select w-full bg-white" value={service.deadlineUnit} onChange={(event) => onUpdate(service.id, "deadlineUnit", event.target.value as ServiceDeadlineUnit)}><option value="dias">dias</option><option value="semanas">semanas</option><option value="meses">meses</option></select></label></div><div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3"><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Valor</span><Input type="number" min="0" step="0.01" value={service.price} onChange={(event) => onUpdate(service.id, "price", Number(event.target.value))} className="bg-white font-bold" /></label><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Cobrança</span><select className="form-select w-full bg-white" value={service.pricingType} onChange={(event) => onUpdate(service.id, "pricingType", event.target.value as ServicePricingType)}><option value="Fixo">Fixo</option><option value="Mensal">Mensal</option><option value="A partir de">A partir de</option></select></label></div><div className="mt-4 flex items-center justify-between border-t border-[#E8ECE7] pt-3 text-xs font-semibold text-[#7D8983]"><span>Prazo de entrega</span><span className="font-bold text-[#087E5A]">{service.deadline} {service.deadlineUnit}</span></div></article>)}</div> : <div className="mt-5 grid min-h-64 place-items-center rounded-2xl border border-dashed border-[#C9D9CF] bg-[#F7FBF8] px-5 py-10 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#E8F6F0] text-[#087E5A]"><BriefcaseBusiness size={21} /></div><p className="mt-4 font-display font-extrabold text-[#27302D]">Seu catálogo começa aqui</p><p className="mt-1 max-w-sm text-sm leading-5 text-[#74817A]">Cadastre seu primeiro serviço com escopo, prazo e valor para ganhar agilidade nas propostas.</p><Button onClick={onAdd} className="mt-5 bg-[#10A97A] font-bold text-white hover:bg-[#087E5A]"><Plus size={16} />Cadastrar primeiro serviço</Button></div></div>}
+    </div>
   </div>;
 }
 
