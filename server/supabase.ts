@@ -186,6 +186,7 @@ export async function syncService(workspaceId: string, service: any) {
     deadline_unit: deadlineUnit,
     price,
     pricing_type: pricingType,
+    position: Math.max(0, Number(service?.position) || 0),
     updated_at: new Date().toISOString(),
   };
   const { error } = await supabase.from("services").upsert(row);

@@ -25,6 +25,8 @@ import {
   GitBranch,
   GripVertical,
   Layers,
+  LayoutGrid,
+  List,
   Mail,
   MessageCircle,
   PhoneCall,
@@ -82,6 +84,7 @@ type Service = {
   deadlineUnit: ServiceDeadlineUnit;
   price: number;
   pricingType: ServicePricingType;
+  position: number;
 };
 
 type FinanceEntry = {
@@ -625,7 +628,7 @@ export default function Home() {
   const [trashedProspectLists, setTrashedProspectLists] = useState<TrashedProspectList[]>(() => storedTrashedProspectLists());
   const [cadenceBlocks, setCadenceBlocks] = useState<CadenceBlock[]>(() => storedValue("ritmo-cadence-blocks", initialCadenceBlocks));
   const [financeEntries, setFinanceEntries] = useState<FinanceEntry[]>(() => storedValue("ritmo-finance-entries", []));
-  const [services, setServices] = useState<Service[]>(() => storedValue("ritmo-services", []));
+  const [services, setServices] = useState<Service[]>(() => storedValue<Service[]>("ritmo-services", []).map((service, position) => ({ ...service, position: Number.isFinite(service.position) ? service.position : position })));
   const [draggedCadenceId, setDraggedCadenceId] = useState<string | null>(null);
   const [cadenceEditId, setCadenceEditId] = useState<string | null>(null);
   const [activeProspectListId, setActiveProspectListId] = useState(() => storedValue("ritmo-active-prospect-list", "prospect-list-default"));
@@ -738,7 +741,7 @@ export default function Home() {
 
     const normalizedCadenceBlocks = ((cadenceBlockRows ?? []) as CadenceBlockRow[]).map((block) => ({ id: block.id, day: Number(block.day), slot: block.slot, title: block.title, channel: block.channel, notes: block.notes }));
     const normalizedFinanceEntries = ((financeRows ?? []) as FinanceEntryRow[]).map((entry) => ({ id: entry.id, expense: entry.expense, amount: Number(entry.amount), installment: entry.installment, dueDate: entry.due_date ?? "", notes: entry.notes }));
-    const normalizedServices = ((serviceRows ?? []) as ServiceRow[]).map((service) => ({ id: service.id, name: service.name, deliverables: service.deliverables, deadline: Number(service.deadline), deadlineUnit: service.deadline_unit, price: Number(service.price), pricingType: service.pricing_type }));
+    const normalizedServices = ((serviceRows ?? []) as ServiceRow[]).sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0)).map((service, position) => ({ id: service.id, name: service.name, deliverables: service.deliverables, deadline: Number(service.deadline), deadlineUnit: service.deadline_unit, price: Number(service.price), pricingType: service.pricing_type, position }));
     const normalizedGoalSimulationStages = ((goalSimulationStageRows ?? []) as GoalSimulationStageRecord[]).map((stage) => ({ id: stage.id, name: stage.name, color: stage.color, probability: Number(stage.probability), projectionMode: (stage.projection_mode === "fixo" || stage.projection_mode === "produto" ? stage.projection_mode : "percentual") as SimulationProjectionMode, fixedValue: Math.max(0, Number(stage.fixed_value) || 0), productId: stage.product_id ?? "", conversionStageId: stage.conversion_stage_id ?? "" }));
 
     const normalizedGoals = ((goalRows ?? []) as GoalRecord[]).map((goal) => ({
@@ -846,7 +849,7 @@ export default function Home() {
     }
   }, [prospectLists, trashedProspectLists, activeProspectListId, cadenceBlocks, financeEntries, services, goalSimulationStages, workspaceId]);
 
-  async function syncCurrentWorkspace() {
+  async function syncCurrentWorkspace(overrides: { services?: Service[] } = {}) {
     if (!workspaceId) throw new Error("Workspace Supabase indisponível.");
     const attempt = ++syncAttemptRef.current;
     setIsSyncConfirmed(false);
@@ -859,7 +862,7 @@ export default function Home() {
       trashedProspectLists,
       cadenceBlocks,
       financeEntries,
-      services,
+      services: overrides.services ?? services,
       goalSimulationStages,
     } });
     if (syncAttemptRef.current === attempt) setIsSyncConfirmed(true);
@@ -940,13 +943,31 @@ export default function Home() {
     toast.success("Lançamento removido.");
   }
   function addService() {
-    const nextService: Service = { id: uniqueId("service"), name: "Novo serviço", deliverables: "Descreva os entregáveis", deadline: 7, deadlineUnit: "dias", price: 0, pricingType: "Fixo" };
-    setServices((current) => [nextService, ...current]);
+    const nextService: Service = { id: uniqueId("service"), name: "Novo serviço", deliverables: "Descreva os entregáveis", deadline: 7, deadlineUnit: "dias", price: 0, pricingType: "Fixo", position: 0 };
+    setServices((current) => [nextService, ...current].map((service, position) => ({ ...service, position })));
     setPage("services");
     toast.success("Serviço adicionado.");
   }
   function updateService(id: string, field: keyof Omit<Service, "id">, value: string | number) {
     setServices((current) => current.map((service) => service.id === id ? { ...service, [field]: field === "deadline" || field === "price" ? Number(value) || 0 : value } : service));
+  }
+  async function reorderServices(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const ordered = [...services].sort((a, b) => a.position - b.position);
+    const fromIndex = ordered.findIndex((service) => service.id === fromId);
+    const toIndex = ordered.findIndex((service) => service.id === toId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const [moved] = ordered.splice(fromIndex, 1);
+    ordered.splice(toIndex, 0, moved);
+    const nextServices = ordered.map((service, position) => ({ ...service, position }));
+    setServices(nextServices);
+    if (!workspaceId) return;
+    try {
+      await syncCurrentWorkspace({ services: nextServices });
+      toast.success("Ordem dos serviços salva.");
+    } catch {
+      toast.error("Não foi possível salvar a nova ordem dos serviços.");
+    }
   }
   async function saveService(id: string) {
     const service = services.find((item) => item.id === id);
@@ -971,7 +992,7 @@ export default function Home() {
     }
   }
   function deleteService(id: string) {
-    setServices((current) => current.filter((service) => service.id !== id));
+    setServices((current) => current.filter((service) => service.id !== id).map((service, position) => ({ ...service, position })));
     toast.success("Serviço removido.");
   }
   function addCadenceBlock(day: number, slot: CadenceSlot, details?: Pick<CadenceBlock, "title" | "channel" | "notes">) {
@@ -1727,7 +1748,7 @@ export default function Home() {
         ) : page === "finance" ? (
           <FinanceWorkspace entries={financeEntries} onAdd={addFinanceEntry} onUpdate={updateFinanceEntry} onDelete={deleteFinanceEntry} />
         ) : page === "services" ? (
-          <ServicesWorkspace services={services} onAdd={addService} onUpdate={updateService} onDelete={deleteService} onSave={saveService} savingServiceId={savingServiceId} />
+          <ServicesWorkspace services={services} onAdd={addService} onUpdate={updateService} onDelete={deleteService} onSave={saveService} onReorder={reorderServices} savingServiceId={savingServiceId} />
         ) : (
           <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} funnels={funnels} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onReorder={reorderProspects} onDelete={deleteProspect} onImportList={importProspectList} onSave={saveProspectsToCloud} onSaveProspect={saveProspectToCloud} isSaving={isProspectSaving} savingProspectId={savingProspectId} onConnect={() => setAuthDialogOpen(true)} />
         )}
@@ -2228,10 +2249,39 @@ function FinanceWorkspace({ entries, onAdd, onUpdate, onDelete }: { entries: Fin
   </div>;
 }
 
-function ServicesWorkspace({ services, onAdd, onUpdate, onDelete, onSave, savingServiceId }: { services: Service[]; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<Service, "id">, value: string | number) => void; onDelete: (id: string) => void; onSave: (id: string) => void | Promise<void>; savingServiceId: string | null }) {
+function ServicesWorkspace({ services, onAdd, onUpdate, onDelete, onSave, onReorder, savingServiceId }: { services: Service[]; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<Service, "id">, value: string | number) => void; onDelete: (id: string) => void; onSave: (id: string) => void | Promise<void>; onReorder: (fromId: string, toId: string) => void | Promise<void>; savingServiceId: string | null }) {
+  const [viewMode, setViewMode] = useState<"cards" | "lista">("cards");
+  const [draggedServiceId, setDraggedServiceId] = useState<string | null>(null);
   const totalValue = services.reduce((sum, service) => sum + service.price, 0);
   const monthlyValue = services.filter((service) => service.pricingType === "Mensal").reduce((sum, service) => sum + service.price, 0);
   const averageDeadline = services.length ? Math.round(services.reduce((sum, service) => sum + service.deadline, 0) / services.length) : 0;
+  const orderedServices = useMemo(() => [...services].sort((a, b) => a.position - b.position), [services]);
+
+  const startServiceDrag = (event: DragEvent<HTMLElement>, serviceId: string) => {
+    setDraggedServiceId(serviceId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", serviceId);
+  };
+  const dropService = (event: DragEvent<HTMLElement>, targetId: string) => {
+    event.preventDefault();
+    const sourceId = draggedServiceId ?? event.dataTransfer.getData("text/plain");
+    if (sourceId && sourceId !== targetId) void onReorder(sourceId, targetId);
+    setDraggedServiceId(null);
+  };
+  const finishServiceDrag = () => setDraggedServiceId(null);
+  const serviceName = (service: Service) => service.name.trim() || "Serviço sem nome";
+  const serviceAction = (service: Service) => <div className="flex items-center gap-1.5">
+    <Button type="button" onClick={() => void onSave(service.id)} disabled={savingServiceId === service.id} className="grid h-8 w-8 place-items-center rounded-lg bg-[#10A97A] p-0 text-white hover:bg-[#087E5A] disabled:cursor-wait disabled:opacity-70" aria-label={`Salvar ${serviceName(service)}`} title="Salvar serviço">
+      {savingServiceId === service.id ? <RotateCcw className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
+    </Button>
+    <button type="button" onClick={() => onDelete(service.id)} className="grid h-8 w-8 place-items-center rounded-lg text-[#9AA59F] transition hover:bg-[#FCECEA] hover:text-[#B04A43]" aria-label={`Excluir ${serviceName(service)}`} title="Excluir serviço"><Trash2 size={15} /></button>
+  </div>;
+  const serviceEditor = (service: Service, compact = false) => <>
+    <label className="block min-w-0"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Nome</span><Input value={service.name} onChange={(event) => onUpdate(service.id, "name", event.target.value)} placeholder="Ex.: Consultoria comercial" className="h-9 bg-white font-bold" /></label>
+    <label className="block min-w-0"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Prazo</span><div className="flex gap-2"><Input type="number" min="1" max="3650" value={service.deadline} onChange={(event) => onUpdate(service.id, "deadline", Number(event.target.value))} className="h-9 min-w-0 bg-white" /><select className="form-select h-9 min-w-0 bg-white" value={service.deadlineUnit} onChange={(event) => onUpdate(service.id, "deadlineUnit", event.target.value as ServiceDeadlineUnit)}><option value="dias">dias</option><option value="semanas">semanas</option><option value="meses">meses</option></select></div></label>
+    <label className="block min-w-0"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Cobrança</span><select className="form-select h-9 w-full bg-white" value={service.pricingType} onChange={(event) => onUpdate(service.id, "pricingType", event.target.value as ServicePricingType)}><option value="Fixo">Fixo</option><option value="Mensal">Mensal</option><option value="A partir de">A partir de</option></select></label>
+    <label className={`${compact ? "sm:col-span-2" : ""} block min-w-0`}><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Entregáveis</span><textarea value={service.deliverables} onChange={(event) => onUpdate(service.id, "deliverables", event.target.value)} placeholder="Escopo, etapas ou resultados incluídos" rows={compact ? 2 : 1} className="form-textarea min-h-0 w-full resize-y bg-white text-sm leading-5" /></label>
+  </>;
 
   return <div className="grid gap-5 pb-8">
     <div className="flex flex-col gap-4 rounded-[26px] border border-[#E3E9E3] bg-[#FCFCFA] p-5 shadow-[0_12px_32px_rgba(30,55,44,0.04)] sm:flex-row sm:items-end sm:justify-between">
@@ -2239,13 +2289,12 @@ function ServicesWorkspace({ services, onAdd, onUpdate, onDelete, onSave, saving
       <Button onClick={onAdd} className="w-full bg-[#10A97A] text-white hover:bg-[#087E5A] sm:w-auto"><Plus size={16} /> Novo serviço</Button>
     </div>
     <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Valor do catálogo</p><p className="mt-2 text-2xl font-bold text-[#087E5A]">{formatCurrency(totalValue)}</p><p className="mt-1 text-xs text-[#8A958F]">{services.length} {services.length === 1 ? "serviço cadastrado" : "serviços cadastrados"}</p></div><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Receita mensal</p><p className="mt-2 text-2xl font-bold text-[#27302D]">{formatCurrency(monthlyValue)}</p><p className="mt-1 text-xs text-[#8A958F]">Serviços com cobrança recorrente</p></div><div className="rounded-2xl border border-[#E3E9E3] bg-[#FCFCFA] p-4"><p className="eyebrow">Prazo médio</p><p className="mt-2 text-2xl font-bold text-[#27302D]">{averageDeadline || "—"}<span className="ml-1 text-sm font-semibold text-[#8A958F]">{averageDeadline ? "unid." : "Cadastre um prazo"}</span></p><p className="mt-1 text-xs text-[#8A958F]">Referência entre os serviços</p></div></div>
-    <div className="rounded-[26px] border border-[#E3E9E3] bg-[#FCFCFA] p-5 shadow-[0_12px_32px_rgba(30,55,44,0.04)] sm:p-6">
-      <div className="flex flex-col gap-2 border-b border-[#E7EBE6] pb-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="eyebrow">Itens do catálogo</p><h2 className="font-display text-lg font-bold text-[#27302D]">Oferta pronta para apresentar</h2></div><span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#E7F5EF] px-3 py-1 text-xs font-bold text-[#087E5A]"><BriefcaseBusiness size={13} />{services.length} {services.length === 1 ? "item" : "itens"}</span></div>
-      {services.length ? <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{services.map((service) => <article key={service.id} className="rounded-2xl border border-[#E3E9E3] bg-[#FBFCFA] p-4 transition hover:border-[#B8DCCB] hover:shadow-[0_10px_24px_rgba(30,55,44,0.06)]"><div className="mb-3 flex items-center justify-between gap-2"><span className="tag-chip bg-[#E8F6F0] text-[#087E5A]">{service.pricingType}</span><div className="flex items-center gap-1.5"><Button type="button" onClick={() => void onSave(service.id)} disabled={savingServiceId === service.id} className="h-8 gap-1.5 rounded-lg bg-[#10A97A] px-2.5 text-xs font-bold text-white hover:bg-[#087E5A] disabled:cursor-wait disabled:opacity-70">{savingServiceId === service.id ? <RotateCcw className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5" />}{savingServiceId === service.id ? "Salvando" : "Salvar"}</Button><button type="button" onClick={() => onDelete(service.id)} className="icon-button hover:text-[#B04A43]" aria-label={`Excluir ${service.name || "serviço"}`} title="Excluir serviço"><Trash2 size={15} /></button></div></div><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Nome do serviço</span><Input value={service.name} onChange={(event) => onUpdate(service.id, "name", event.target.value)} placeholder="Ex.: Consultoria comercial" className="bg-white font-bold" /></label><label className="mt-4 block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Entregáveis</span><textarea value={service.deliverables} onChange={(event) => onUpdate(service.id, "deliverables", event.target.value)} placeholder="Liste os materiais, etapas ou resultados incluídos" rows={4} className="form-textarea w-full resize-y bg-white text-sm" /></label><div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3"><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Prazo</span><Input type="number" min="1" max="3650" value={service.deadline} onChange={(event) => onUpdate(service.id, "deadline", Number(event.target.value))} className="bg-white" /></label><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Unidade</span><select className="form-select w-full bg-white" value={service.deadlineUnit} onChange={(event) => onUpdate(service.id, "deadlineUnit", event.target.value as ServiceDeadlineUnit)}><option value="dias">dias</option><option value="semanas">semanas</option><option value="meses">meses</option></select></label></div><div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3"><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Valor</span><Input type="number" min="0" step="0.01" value={service.price} onChange={(event) => onUpdate(service.id, "price", Number(event.target.value))} className="bg-white font-bold" /></label><label className="block"><span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#74827B]">Cobrança</span><select className="form-select w-full bg-white" value={service.pricingType} onChange={(event) => onUpdate(service.id, "pricingType", event.target.value as ServicePricingType)}><option value="Fixo">Fixo</option><option value="Mensal">Mensal</option><option value="A partir de">A partir de</option></select></label></div><div className="mt-4 flex items-center justify-between border-t border-[#E8ECE7] pt-3 text-xs font-semibold text-[#7D8983]"><span>Prazo de entrega</span><span className="font-bold text-[#087E5A]">{service.deadline} {service.deadlineUnit}</span></div></article>)}</div> : <div className="mt-5 grid min-h-64 place-items-center rounded-2xl border border-dashed border-[#C9D9CF] bg-[#F7FBF8] px-5 py-10 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#E8F6F0] text-[#087E5A]"><BriefcaseBusiness size={21} /></div><p className="mt-4 font-display font-extrabold text-[#27302D]">Seu catálogo começa aqui</p><p className="mt-1 max-w-sm text-sm leading-5 text-[#74817A]">Cadastre seu primeiro serviço com escopo, prazo e valor para ganhar agilidade nas propostas.</p><Button onClick={onAdd} className="mt-5 bg-[#10A97A] font-bold text-white hover:bg-[#087E5A]"><Plus size={16} />Cadastrar primeiro serviço</Button></div></div>}
+    <div className="rounded-[26px] border border-[#E3E9E3] bg-[#FCFCFA] p-4 shadow-[0_12px_32px_rgba(30,55,44,0.04)] sm:p-5">
+      <div className="flex flex-col gap-4 border-b border-[#E7EBE6] pb-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="eyebrow">Itens do catálogo</p><div className="mt-1 flex flex-wrap items-center gap-2"><h2 className="font-display text-lg font-bold text-[#27302D]">Oferta pronta para apresentar</h2><span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F5EF] px-2.5 py-1 text-xs font-bold text-[#087E5E]"><BriefcaseBusiness size={13} />{services.length}</span></div><p className="mt-1 text-xs text-[#7D8983]">Arraste pelo ícone para reorganizar a ordem.</p></div><div className="flex items-center gap-2"><div className="flex items-center rounded-xl border border-[#DDE7DF] bg-[#F7FAF7] p-1" role="group" aria-label="Modo de visualização"><button type="button" onClick={() => setViewMode("cards")} aria-pressed={viewMode === "cards"} className={`grid h-8 w-9 place-items-center rounded-lg transition ${viewMode === "cards" ? "bg-white text-[#087E5A] shadow-sm" : "text-[#85918B] hover:text-[#087E5A]"}`} title="Visualização em cards"><LayoutGrid size={15} /></button><button type="button" onClick={() => setViewMode("lista")} aria-pressed={viewMode === "lista"} className={`grid h-8 w-9 place-items-center rounded-lg transition ${viewMode === "lista" ? "bg-white text-[#087E5A] shadow-sm" : "text-[#85918B] hover:text-[#087E5A]"}`} title="Visualização em lista"><List size={16} /></button></div></div></div>
+      {orderedServices.length ? viewMode === "cards" ? <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">{orderedServices.map((service) => <article key={service.id} draggable onDragStart={(event) => startServiceDrag(event, service.id)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropService(event, service.id)} onDragEnd={finishServiceDrag} className={`rounded-2xl border border-[#E3E9E3] bg-[#FBFCFA] p-3.5 transition hover:border-[#B8DCCB] hover:shadow-[0_8px_20px_rgba(30,55,44,0.06)] ${draggedServiceId === service.id ? "opacity-50" : ""}`}><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><GripVertical className="h-4 w-4 shrink-0 cursor-grab text-[#AAB7AF]" aria-hidden="true" /><span className="tag-chip bg-[#E8F6F0] text-[#087E5A]">{service.pricingType}</span></div><div className="flex items-start gap-3"><div className="text-right"><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#81908A]">Valor</p><p className="font-display text-xl font-extrabold tracking-[-0.045em] text-[#087E5A]">{formatCurrency(service.price)}</p></div>{serviceAction(service)}</div></div><div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)]">{serviceEditor(service, true)}</div></article>)}</div> : <div className="mt-4 overflow-x-auto rounded-2xl border border-[#E3E9E3] bg-[#FBFCFA]"><div className="min-w-[980px]"><div className="grid grid-cols-[28px_minmax(180px,1.4fr)_140px_175px_130px_minmax(190px,1fr)_84px] items-center gap-3 border-b border-[#E7EBE6] bg-[#F7FAF7] px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#7A8881]"><span /><span>Serviço</span><span>Valor</span><span>Prazo</span><span>Cobrança</span><span>Entregáveis</span><span className="text-right">Ações</span></div>{orderedServices.map((service) => <div key={service.id} draggable onDragStart={(event) => startServiceDrag(event, service.id)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropService(event, service.id)} onDragEnd={finishServiceDrag} className={`grid grid-cols-[28px_minmax(180px,1.4fr)_140px_175px_130px_minmax(190px,1fr)_84px] items-center gap-3 border-b border-[#EDF0EC] px-3 py-3 last:border-b-0 hover:bg-[#FAFCFA] ${draggedServiceId === service.id ? "bg-[#F0F8F3] opacity-60" : ""}`}><GripVertical className="h-4 w-4 cursor-grab text-[#AAB7AF]" aria-label="Arrastar para reordenar" /><label className="min-w-0"><span className="sr-only">Nome do serviço</span><Input value={service.name} onChange={(event) => onUpdate(service.id, "name", event.target.value)} className="h-9 bg-white font-bold" /></label><label className="min-w-0"><span className="sr-only">Valor</span><Input type="number" min="0" step="0.01" value={service.price} onChange={(event) => onUpdate(service.id, "price", Number(event.target.value))} className="h-9 bg-white font-bold text-[#087E5A]" /></label><label className="flex min-w-0 gap-2"><span className="sr-only">Prazo</span><Input type="number" min="1" max="3650" value={service.deadline} onChange={(event) => onUpdate(service.id, "deadline", Number(event.target.value))} className="h-9 min-w-0 bg-white" /><select className="form-select h-9 min-w-0 bg-white" value={service.deadlineUnit} onChange={(event) => onUpdate(service.id, "deadlineUnit", event.target.value as ServiceDeadlineUnit)}><option value="dias">dias</option><option value="semanas">semanas</option><option value="meses">meses</option></select></label><label className="min-w-0"><span className="sr-only">Cobrança</span><select className="form-select h-9 w-full bg-white" value={service.pricingType} onChange={(event) => onUpdate(service.id, "pricingType", event.target.value as ServicePricingType)}><option value="Fixo">Fixo</option><option value="Mensal">Mensal</option><option value="A partir de">A partir de</option></select></label><label className="min-w-0"><span className="sr-only">Entregáveis</span><textarea value={service.deliverables} onChange={(event) => onUpdate(service.id, "deliverables", event.target.value)} rows={1} className="form-textarea min-h-0 w-full resize-y bg-white text-sm leading-5" /></label><div className="flex justify-end">{serviceAction(service)}</div></div>)}</div></div> : <div className="mt-4 grid min-h-64 place-items-center rounded-2xl border border-dashed border-[#C9D9CF] bg-[#F7FBF8] px-5 py-10 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#E8F6F0] text-[#087E5A]"><BriefcaseBusiness size={21} /></div><p className="mt-4 font-display font-extrabold text-[#27302D]">Seu catálogo começa aqui</p><p className="mt-1 max-w-sm text-sm leading-5 text-[#74817A]">Cadastre seu primeiro serviço com escopo, prazo e valor para ganhar agilidade nas propostas.</p><Button onClick={onAdd} className="mt-5 bg-[#10A97A] font-bold text-white hover:bg-[#087E5A]"><Plus size={16} />Cadastrar primeiro serviço</Button></div></div>}
     </div>
   </div>;
 }
-
 function ActivitiesWorkspace({ deals, onToggleActivity, onOpenDeal, onNewDeal }: { deals: Deal[]; onToggleActivity: (deal: Deal, activity: DealActivity) => void; onOpenDeal: (deal: Deal) => void; onNewDeal: () => void }) {
   const rows = deals.flatMap((deal) => {
     const activities = deal.activities?.length ? deal.activities : [{ id: `next-${deal.id}`, subject: "Próxima atividade", dueAt: deal.nextActivity, done: deal.nextActivity === "Sem pendências" }];
