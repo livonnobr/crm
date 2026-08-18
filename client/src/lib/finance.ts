@@ -9,8 +9,9 @@ export function summarizeFinanceEntries(entries: FinanceSummaryEntry[], today = 
   const nextDue = entries
     .filter((entry) => entry.dueDate)
     .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))[0];
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   const daysRemaining = nextDue?.dueDate
-    ? Math.ceil((new Date(`${nextDue.dueDate}T23:59:59`).getTime() - today.getTime()) / 86400000)
+    ? Math.round((new Date(`${nextDue.dueDate}T00:00:00`).getTime() - todayStart) / 86400000)
     : null;
 
   return { total, count: entries.length, nextDue, daysRemaining };

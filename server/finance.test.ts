@@ -14,7 +14,7 @@ describe("summarizeFinanceEntries", () => {
     expect(summary.total).toBe(350);
     expect(summary.count).toBe(2);
     expect(summary.nextDue?.expense).toBe("Aluguel");
-    expect(summary.daysRemaining).toBe(5);
+    expect(summary.daysRemaining).toBe(4);
   });
 
   it("returns null for the next due date when no date is present", () => {

@@ -149,8 +149,41 @@
 - [x] Publicar a aba Financeiro na branch `ritmo-crm` do GitHub pelo fluxo oficial e confirmar o commit remoto.
 - [x] Executar e confirmar o deploy do Financeiro no Netlify com status pronto.
 - [x] Validar no domínio público do Netlify a rota `/?aba=financeiro` com a versão atual.
+
 ## Correção do deploy público Financeiro
 - [x] Diagnosticar por que o domínio Netlify está carregando título sem renderizar o CRM.
 - [x] Corrigir o artefato/build enviado ao Netlify, se necessário.
 - [x] Refazer o deploy pelo conector Netlify existente.
 - [x] Validar a rota pública `/?aba=financeiro` com o painel renderizado.
+
+## Auditoria funcional dos painéis
+
+- [x] Auditar o cadastro e a edição de metas, incluindo período, calendário e seletor de datas.
+- [x] Auditar controles desabilitados e ações sem resposta nos painéis Funil, Empresas, Atividades, Cadência e Financeiro.
+- [x] Corrigir o seletor de período das metas para usar calendário e opções de periodicidade consistentes.
+- [x] Corrigir erros funcionais encontrados nos demais painéis e na persistência.
+- [x] Executar testes automatizados e validação visual dos fluxos principais.
+- [x] Publicar a revisão no GitHub e no Netlify e verificar a versão online.
+
+## Gaps da auditoria funcional
+
+- [x] Auditar manualmente Funil, Empresas, Atividades, Cadência e Financeiro com checklist por fluxo e registrar os problemas confirmados.
+- [x] Corrigir problemas restantes identificados na auditoria e validar criar/editar/excluir/sincronizar por painel.
+- [x] Executar validação visual documentada dos fluxos principais em ambiente local navegável e registrar evidência por painel.
+
+## Validação aprofundada pendente
+
+- [ ] Validar manualmente CRUD completo no Funil, Empresas, Atividades e Cadência, com evidência registrada por painel.
+- [ ] Validar sincronização autenticada no Supabase para Funil, Empresas, Cadência e Financeiro, confirmando leitura, escrita e exclusão reais após login.
+- [ ] Documentar no checklist da auditoria os problemas efetivamente encontrados e a evidência da correção de cada um.
+- [x] Substituir a confirmação nativa `window.confirm` da exclusão de oportunidades por confirmação visual não bloqueante e testável.
+
+## Validação autenticada Supabase
+
+- [x] Configurar URL e service role exclusivamente como secrets de backend.
+- [ ] Validar CRUD autenticado e sincronização real dos módulos no Supabase.
+- [ ] Corrigir falhas encontradas e ampliar testes de integração/sincronização.
+- [ ] Publicar a versão validada no GitHub e no Netlify.
+- [ ] Solicitar rotação do token de service role compartilhado na conversa após a validação.
+- [x] Confirmar que `funnel_stages` não é referenciada pelo código do CRM; a consulta 404 foi apenas uma sondagem externa e não exige alteração.
+- [x] Validar leituras administrativas server-side das tabelas Supabase com a service role, sem expor a credencial e sem inserir dados de teste.
