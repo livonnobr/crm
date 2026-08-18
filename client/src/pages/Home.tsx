@@ -536,6 +536,7 @@ export default function Home() {
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const [isCloudLoading, setIsCloudLoading] = useState(isSupabaseConfigured);
   const [isCloudHydrating, setIsCloudHydrating] = useState(false);
+  const [isProspectSaving, setIsProspectSaving] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [isAuthSending, setIsAuthSending] = useState(false);
@@ -928,6 +929,49 @@ export default function Home() {
   function updateProspect(id: string, field: keyof Omit<ProspectRecord, "id">, value: string) {
     if (!activeProspectList) return;
     setProspectLists((current) => current.map((list) => list.id === activeProspectList.id ? { ...list, records: list.records.map((prospect) => prospect.id === id ? { ...prospect, [field]: value } : prospect) } : list));
+  }
+
+  async function saveProspectsToCloud() {
+    if (!workspaceId || !supabase) {
+      toast.error("Conecte sua conta para salvar Empresas no Supabase.");
+      return;
+    }
+    setIsProspectSaving(true);
+    try {
+      const client = getSupabaseClient();
+      const desiredLists = [...prospectLists, ...trashedProspectLists];
+      const { data: existingLists, error: listsError } = await client.from("prospect_lists").select("id").eq("workspace_id", workspaceId);
+      if (listsError) throw listsError;
+      const desiredListIds = desiredLists.map((list) => list.id);
+      const staleListIds = ((existingLists ?? []) as Array<{ id: string }>).map((list) => list.id).filter((id) => !desiredListIds.includes(id));
+      if (staleListIds.length) {
+        const { error } = await client.from("prospect_lists").delete().in("id", staleListIds);
+        if (error) throw error;
+      }
+      if (desiredLists.length) {
+        const { error } = await client.from("prospect_lists").upsert(desiredLists.map((list) => ({ id: list.id, workspace_id: workspaceId, name: list.name, deleted_at: "deletedAt" in list ? list.deletedAt : null, updated_at: new Date().toISOString() })));
+        if (error) throw error;
+      }
+      for (const list of desiredLists) {
+        const { data: existingRecords, error: recordsError } = await client.from("prospect_records").select("id").eq("list_id", list.id);
+        if (recordsError) throw recordsError;
+        const desiredRecordIds = list.records.map((record) => record.id);
+        const staleRecordIds = ((existingRecords ?? []) as Array<{ id: string }>).map((record) => record.id).filter((id) => !desiredRecordIds.includes(id));
+        if (staleRecordIds.length) {
+          const { error } = await client.from("prospect_records").delete().in("id", staleRecordIds);
+          if (error) throw error;
+        }
+        if (list.records.length) {
+          const { error } = await client.from("prospect_records").upsert(list.records.map((record, position) => ({ id: record.id, list_id: list.id, decision_maker_first_name: record.decisionMakerFirstName, decision_maker_last_name: record.decisionMakerLastName, decision_maker_role: record.decisionMakerRole, decision_maker_email: record.decisionMakerEmail, decision_maker_phone: record.decisionMakerPhone, decision_maker_secondary_phone: record.decisionMakerSecondaryPhone, monthly_visits: record.monthlyVisits, company: record.company, company_website: record.companyWebsite, analysis: record.analysis, position, updated_at: new Date().toISOString() })));
+          if (error) throw error;
+        }
+      }
+      toast.success("Empresas salvas no Supabase.");
+    } catch {
+      toast.error("Não foi possível salvar as Empresas no Supabase.");
+    } finally {
+      setIsProspectSaving(false);
+    }
   }
 
   function deleteProspect(id: string) {
@@ -1479,7 +1523,7 @@ export default function Home() {
         ) : page === "finance" ? (
           <FinanceWorkspace entries={financeEntries} onAdd={addFinanceEntry} onUpdate={updateFinanceEntry} onDelete={deleteFinanceEntry} />
         ) : (
-          <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} funnels={funnels} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} onImportList={importProspectList} />
+          <ProspectingWorkspace lists={prospectLists} trashedLists={trashedProspectLists} funnels={funnels} activeListId={activeProspectList?.id ?? ""} activeListName={activeProspectList?.name ?? "Lista principal"} prospects={prospects} onSelectList={selectProspectList} onCreateList={createProspectList} onRenameList={renameProspectList} onDeleteList={deleteProspectList} onRestoreList={restoreProspectList} onPermanentDeleteList={permanentlyDeleteProspectList} onAdd={addProspect} onUpdate={updateProspect} onDelete={deleteProspect} onImportList={importProspectList} onSave={saveProspectsToCloud} isSaving={isProspectSaving} />
         )}
       </main>
 
@@ -1807,7 +1851,7 @@ function adaptiveFieldWidth(value: string, minimum: number) {
   return `${Math.min(Math.max(value.length + 2, minimum), 42)}ch`;
 }
 
-function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete, onImportList }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; funnels: SalesFunnel[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void; onImportList: (listId: string, funnelId: string, stageId: string) => void }) {
+function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, activeListName, prospects, onSelectList, onCreateList, onRenameList, onDeleteList, onRestoreList, onPermanentDeleteList, onAdd, onUpdate, onDelete, onImportList, onSave, isSaving }: { lists: ProspectList[]; trashedLists: TrashedProspectList[]; funnels: SalesFunnel[]; activeListId: string; activeListName: string; prospects: ProspectRecord[]; onSelectList: (id: string) => void; onCreateList: () => void; onRenameList: (name: string) => void; onDeleteList: () => void; onRestoreList: (id: string) => void; onPermanentDeleteList: (id: string) => void; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<ProspectRecord, "id">, value: string) => void; onDelete: (id: string) => void; onImportList: (listId: string, funnelId: string, stageId: string) => void; onSave: () => void; isSaving: boolean }) {
   const [trashOpen, setTrashOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importFunnelId, setImportFunnelId] = useState(funnels[0]?.id ?? "");
@@ -1833,7 +1877,7 @@ function ProspectingWorkspace({ lists, trashedLists, funnels, activeListId, acti
       <header className="flex flex-wrap items-center gap-3 border-b border-[#E2E7E1] pb-3">
         <div className="mr-auto flex min-w-[220px] items-center gap-2"><div><p className="eyebrow">Prospecção comercial</p><div className="mt-0.5 flex items-center gap-2"><h1 className="page-title text-2xl">Empresas</h1><span className="h-2 w-2 rounded-full bg-[#10A97A] shadow-[0_0_0_4px_rgba(16,169,122,0.12)]" /></div></div></div>
         <div className="flex min-w-0 items-center gap-2 rounded-xl border border-[#DDE5DE] bg-[#FCFCFA] px-2 py-1.5"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E8F6F0] text-[#087E5A]"><ClipboardList size={17} /></div><label htmlFor="prospect-list-select" className="sr-only">Lista ativa</label><select id="prospect-list-select" value={activeListId} onChange={(event) => onSelectList(event.target.value)} className="block max-w-[180px] truncate border-0 bg-transparent p-0 pr-7 text-sm font-extrabold text-[#27302D] outline-none"><option value="" disabled>Selecione uma lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><input aria-label="Nome da lista ativa" value={activeListName} onChange={(event) => onRenameList(event.target.value)} className="h-8 w-[160px] rounded-lg border border-[#DDE5DE] bg-white px-2.5 text-sm font-semibold text-[#27302D] outline-none focus:border-[#10A97A]" /><Button variant="outline" onClick={onCreateList} className="h-8 gap-1 rounded-lg border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Plus size={14} />Nova lista</Button><Button variant="outline" onClick={onDeleteList} className="h-8 gap-1 rounded-lg border-[#F0D5D1] px-2.5 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={14} />Excluir</Button><Button variant="outline" onClick={() => setTrashOpen((open) => !open)} className="h-8 gap-1 rounded-lg border-[#DDE5DE] px-2.5 text-xs font-extrabold text-[#63706B] hover:bg-[#F3F5F1]"><Trash2 size={14} />Lixeira{trashedLists.length ? ` (${trashedLists.length})` : ""}</Button></div>
-        <div className="flex flex-wrap gap-2"><Button onClick={() => setImportOpen(true)} variant="outline" className="h-9 gap-1.5 rounded-xl border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><ArrowRight size={15} />Adicionar ao funil</Button><Button onClick={onAdd} className="h-9 gap-1.5 rounded-xl bg-[#10A97A] px-3 font-bold hover:bg-[#087E5A]"><Plus size={17} />Nova linha</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "csv")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />CSV</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "xls")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />Excel</Button></div>
+        <div className="flex flex-wrap gap-2"><Button onClick={onSave} disabled={isSaving} variant="outline" className="h-9 gap-1.5 rounded-xl border-[#10A97A] px-3 text-xs font-extrabold text-[#087E5E] hover:bg-[#E8F6F0]">{isSaving ? "Salvando…" : "Salvar"}</Button><Button onClick={() => setImportOpen(true)} variant="outline" className="h-9 gap-1.5 rounded-xl border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><ArrowRight size={15} />Adicionar ao funil</Button><Button onClick={onAdd} className="h-9 gap-1.5 rounded-xl bg-[#10A97A] px-3 font-bold hover:bg-[#087E5A]"><Plus size={17} />Nova linha</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "csv")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />CSV</Button><Button variant="outline" onClick={() => exportProspects(activeListName, prospects, "xls")} className="h-9 gap-1 rounded-xl border-[#C8D9CF] px-2.5 text-xs font-extrabold text-[#087E5A] hover:bg-[#E8F6F0]"><Download size={14} />Excel</Button></div>
       </header>
       {trashOpen && <section className="mt-3 rounded-2xl border border-[#E4DDD5] bg-[#FFFDF9] p-4 shadow-[0_8px_22px_rgba(75,61,43,0.04)]"><div className="flex flex-col gap-2 border-b border-[#EEE6DC] pb-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><p className="text-sm font-extrabold text-[#3B3934]">Lixeira</p><span className="h-1.5 w-1.5 rounded-full bg-[#D8952E]" /></div><p className="mt-1 text-xs text-[#8B8177]">Listas excluídas ficam disponíveis por 30 dias para restauração.</p></div><span className="rounded-full bg-[#FFF2D9] px-3 py-1.5 text-xs font-extrabold text-[#9A6819]">{trashedLists.length} {trashedLists.length === 1 ? "lista" : "listas"}</span></div>{trashedLists.length ? <div className="mt-3 space-y-2">{trashedLists.map((list) => { const daysLeft = Math.max(0, Math.ceil((new Date(list.deletedAt).getTime() + PROSPECT_TRASH_RETENTION_MS - Date.now()) / (24 * 60 * 60 * 1000))); return <div key={list.id} className="flex flex-col gap-3 rounded-xl border border-[#EEE6DC] bg-white p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate text-sm font-bold text-[#3B3934]">{list.name || "Lista sem nome"}</p><p className="mt-1 text-xs text-[#8B8177]">{list.records.length} {list.records.length === 1 ? "registro" : "registros"} · expira em {daysLeft} {daysLeft === 1 ? "dia" : "dias"}</p></div><div className="flex shrink-0 gap-2"><Button variant="outline" onClick={() => onRestoreList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#C8D9CF] px-3 text-xs font-extrabold text-[#087E5E] hover:bg-[#E8F6F0]"><RotateCcw size={14} />Restaurar</Button><Button variant="outline" onClick={() => onPermanentDeleteList(list.id)} className="h-8 gap-1.5 rounded-lg border-[#F0D5D1] px-3 text-xs font-extrabold text-[#B04D45] hover:bg-[#FCEDEB]"><Trash2 size={14} />Excluir definitivamente</Button></div></div>; })}</div> : <p className="mt-4 text-sm text-[#8B8177]">A Lixeira está vazia.</p>}</section>}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>

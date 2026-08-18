@@ -295,3 +295,5 @@
 - [x] Calcular o fechamento do mês em dias úteis, excluindo sábados, domingos e feriados
 - [x] Renomear a aplicação visível para Ritmo, removendo o sufixo CRM de Metas
 - [x] Configurar favicon da marca Ritmo
+- [x] Auditar se novos cadastros de Empresas são persistidos automaticamente no Supabase
+- [x] Adicionar botão Salvar explícito para Empresas se o fluxo atual não confirmar a gravação
