@@ -353,3 +353,5 @@
 - [x] Fazer Empresas, Metas e Funil usarem automaticamente o workspace do proprietário
 
 - [x] Restringir o snapshot server-side de Empresas aos registros das listas do workspace autenticado
+
+- [x] Usar as conexões já configuradas para resolver automaticamente o workspace do proprietário na Vercel, sem exigir conexão manual do Supabase

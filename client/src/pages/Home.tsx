@@ -545,7 +545,7 @@ export default function Home() {
   // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
   // startLogin() during render (no href={startLogin()}) — it mints a one-time
   // nonce cookie and must run only at the moment of navigation.
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
+  let { user, loading, error, isAuthenticated, logout } = useAuth({ redirectOnUnauthenticated: true });
   const workspaceBootstrap = trpc.workspace.bootstrap.useQuery(undefined, { enabled: isAuthenticated });
   const workspaceSnapshot = trpc.workspace.snapshot.useQuery(undefined, { enabled: isAuthenticated });
   const syncWorkspaceMutation = trpc.workspace.sync.useMutation();
