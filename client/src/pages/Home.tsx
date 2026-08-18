@@ -237,8 +237,6 @@ type StageRecord = { id: string; funnel_id: string; name: string; color: string;
 type OpportunityRecord = { id: string; funnel_id: string; stage_id: string; title: string; company: string; value: number | string; owner_initials: string; tag: string; next_activity: string; position: number; contact_name?: string | null; contact_role?: string | null; contact_email?: string | null; contact_phone?: string | null; company_data?: CompanyData | null; activities?: DealActivity[] | null;   notes?: DealNote[] | null; stage_history?: string[] | null };
 
 const logoUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/XzvVLbbQIKNxqUWR.png";
-const heroUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/jujGClJPiwgthxhk.jpg";
-const goalsArtUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/RDXmzGzuzzJtGuhx.jpg";
 const funnelArtUrl = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663898378323/RSAFUTacmmjjoCvV.jpg";
 
 const initialGoals: GoalItem[] = [
@@ -1730,15 +1728,6 @@ function GoalsWorkspace({ goals, averageGoalProgress, onNewGoal, onOpenPipeline,
           <div className="instrument-cell border-[#E5BE6B] bg-[#FFF4D9] shadow-[0_10px_24px_rgba(196,141,35,0.12)]"><div className="flex items-center gap-2"><span className="pulse-dot bg-[#C88920]" /><span className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#8A651D]">Fechamento do mês</span></div><p className="mt-4 font-display text-[34px] font-extrabold tracking-[-0.07em] text-[#6B4D12]">{daysRemaining} {daysRemaining === 1 ? "dia útil" : "dias úteis"}</p><p className="mt-2 text-[14px] font-semibold capitalize text-[#8A6D2A]">restantes em {currentMonth}</p></div>
         </section>
         <GoalSimulator funnels={funnels} conversionRates={conversionRates} onSaveConversionRates={onSaveConversionRates} />
-        <section className="hero-panel mt-5 overflow-hidden">
-          <img src={heroUrl} alt="Caminho abstrato em ascensão representando avanço comercial" className="absolute inset-0 h-full w-full object-cover opacity-75" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,30,27,0.96)_0%,rgba(18,30,27,0.86)_45%,rgba(18,30,27,0.28)_100%)]" />
-          <div className="relative z-10 max-w-[680px] px-6 py-7 sm:px-9 sm:py-8">
-            <div className="mb-7 flex items-center gap-2 text-[#A7E8D1]"><span className="pulse-dot" /><span className="text-xs font-bold uppercase tracking-[0.16em]">Ritmo do mês</span></div>
-            <div className="flex flex-col justify-between gap-7 lg:flex-row lg:items-end"><div><h2 className="font-display text-3xl font-extrabold tracking-[-0.05em] text-white sm:text-[35px]">Cadência saudável.<br /><span className="text-[#8DE2C4]">Foco no que aproxima.</span></h2><p className="mt-3 max-w-md text-sm leading-6 text-[#C7D5D0]">Você está sustentando o volume de prospecção e acelerando negociações na hora certa.</p></div><div className="min-w-[155px] rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#B8CEC6]">Progresso médio</p><div className="mt-2 flex items-baseline gap-1"><strong className="font-display text-4xl tracking-[-0.06em] text-white">{averageGoalProgress}</strong><span className="font-bold text-[#8DE2C4]">%</span></div><p className="mt-2 text-xs text-[#D3E3DD]">das metas em curso</p></div></div>
-          </div>
-        </section>
-
       </div>
     </div>
   );

@@ -303,3 +303,5 @@
 - [x] Remover a repetição de Prospecção na linha inferior dos cards de Metas
 - [x] Remover a observação sobre sábados, domingos e feriados do card Fechamento do mês
 - [x] Aumentar o número e os textos do card Fechamento do mês
+- [x] Remover o banner visual Cadência saudável da interface
+- [x] Remover o cartão visual Receita realizada / Meta em vendas da interface
