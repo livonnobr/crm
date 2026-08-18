@@ -71,7 +71,7 @@ import { projectFunnelStages, reorderFunnelStages } from "@/lib/funnel-utils";
 import { snapshotHasPersistedData } from "@/lib/workspace-hydration";
 import { trpc } from "@/lib/trpc";
 
-type Page = "goals" | "pipeline" | "activities" | "people" | "prospecting" | "cadence" | "finance" | "services";
+type Page = "goals" | "pipeline" | "activities" | "people" | "prospecting" | "finance" | "services";
 
 type ServicePricingType = "Fixo" | "Mensal" | "A partir de";
 type ServiceDeadlineUnit = "dias" | "semanas" | "meses";
@@ -614,7 +614,7 @@ export default function Home() {
 
   const [page, setPage] = useState<Page>(() => {
     const tab = new URLSearchParams(window.location.search).get("aba");
-    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : tab === "cadencia" ? "cadence" : tab === "prospeccao" ? "prospecting" : tab === "financeiro" ? "finance" : tab === "servicos" ? "services" : "goals";
+    return tab === "funil" ? "pipeline" : tab === "atividades" ? "activities" : tab === "prospeccao" ? "prospecting" : tab === "financeiro" ? "finance" : tab === "servicos" ? "services" : "goals";
   });
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [isSidebarHovering, setIsSidebarHovering] = useState(false);
@@ -925,7 +925,7 @@ export default function Home() {
     setPage(nextPage);
     const url = new URL(window.location.href);
     if (nextPage === "goals") url.searchParams.delete("aba");
-    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : nextPage === "people" ? "pessoas" : nextPage === "cadence" ? "cadencia" : nextPage === "finance" ? "financeiro" : nextPage === "services" ? "servicos" : "prospeccao");
+    else url.searchParams.set("aba", nextPage === "pipeline" ? "funil" : nextPage === "activities" ? "atividades" : nextPage === "people" ? "pessoas" : nextPage === "finance" ? "financeiro" : nextPage === "services" ? "servicos" : "prospeccao");
     window.history.replaceState({}, "", url);
   }
 
@@ -1606,12 +1606,11 @@ export default function Home() {
       <SidebarContent className="px-2">
         <SidebarGroup className="p-0">
           <SidebarMenu>
-            <SidebarItem icon={<Target size={19} />} label="Metas" active={page === "goals"} onClick={() => selectPage("goals")} />
+            <SidebarItem icon={<Target size={19} />} label="Planos e Metas" active={page === "goals"} onClick={() => selectPage("goals")} />
             <SidebarItem icon={<GitBranch size={19} />} label="Funil de vendas" active={page === "pipeline"} onClick={() => selectPage("pipeline")} />
             <SidebarItem icon={<Users size={19} />} label="Pessoas" active={page === "people"} onClick={() => selectPage("people")} />
             <SidebarItem icon={<Calendar size={19} />} label="Atividades" active={page === "activities"} onClick={() => selectPage("activities")} />
             <SidebarItem icon={<ClipboardList size={19} />} label="Empresas" active={page === "prospecting"} onClick={() => selectPage("prospecting")} />
-            <SidebarItem icon={<GitBranch size={19} />} label="Cadência" active={page === "cadence"} onClick={() => selectPage("cadence")} />
             <SidebarItem icon={<CircleDollarSign size={19} />} label="Financeiro" active={page === "finance"} onClick={() => selectPage("finance")} />
             <SidebarItem icon={<BriefcaseBusiness size={19} />} label="Serviços" active={page === "services"} onClick={() => selectPage("services")} />
           </SidebarMenu>
@@ -1661,7 +1660,7 @@ export default function Home() {
           <img className="h-8 w-8 rounded-lg" src={logoUrl} alt="" />
           <span className="font-display text-lg font-extrabold tracking-[-0.06em]">ritmo</span>
         </div>
-        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" || page === "people" ? addProspect : page === "cadence" ? () => addCadenceBlock(1, "morning") : page === "finance" ? addFinanceEntry : page === "services" ? addService : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
+        <button onClick={page === "goals" ? openNewGoal : page === "prospecting" || page === "people" ? addProspect : page === "finance" ? addFinanceEntry : page === "services" ? addService : openNewDeal} className="grid h-10 w-10 place-items-center rounded-xl bg-[#10A97A] text-white" aria-label="Criar">
           <Plus className="h-5 w-5" />
         </button>
       </div>
@@ -1678,6 +1677,11 @@ export default function Home() {
             onEditGoal={openEditGoal}
             onDeleteGoal={deleteGoal}
             onReorderGoals={reorderGoals}
+            cadenceBlocks={cadenceBlocks}
+            onAddCadenceBlock={addCadenceBlock}
+            onMoveCadenceBlock={moveCadenceBlock}
+            onEditCadenceBlock={editCadenceBlock}
+            onDeleteCadenceBlock={deleteCadenceBlock}
             simulationStages={goalSimulationStages}
             services={services}
             funnels={funnels}
@@ -1743,8 +1747,6 @@ export default function Home() {
           <ActivitiesWorkspace deals={openDeals} onToggleActivity={toggleWorkspaceActivity} onOpenDeal={openDealDetail} onNewDeal={openNewDeal} />
         ) : page === "people" ? (
           <PeopleWorkspace lists={prospectLists.filter((list) => !list.deletedAt)} />
-        ) : page === "cadence" ? (
-          <CadenceWorkspace blocks={cadenceBlocks} onAdd={addCadenceBlock} onMove={moveCadenceBlock} onEdit={editCadenceBlock} onDelete={deleteCadenceBlock} />
         ) : page === "finance" ? (
           <FinanceWorkspace entries={financeEntries} onAdd={addFinanceEntry} onUpdate={updateFinanceEntry} onDelete={deleteFinanceEntry} />
         ) : page === "services" ? (
@@ -1940,7 +1942,7 @@ function DealDetailDialog({ deal, open, onOpenChange, onUpdate, onAddActivity, o
   );
 }
 
-function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedMonthChange, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, simulationStages, services, funnels, onAddSimulationStage, onUpdateSimulationStage, onDeleteSimulationStage, onSave, isSaving, syncConfirmed }: { goals: GoalItem[]; averageGoalProgress: number; selectedMonth: string; onSelectedMonthChange: (month: string) => void; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; simulationStages: GoalSimulationStage[]; services: Service[]; funnels: SalesFunnel[]; onAddSimulationStage: () => void; onUpdateSimulationStage: (id: string, field: "name" | "color" | "probability" | "projectionMode" | "fixedValue" | "productId" | "conversionStageId", value: string | number) => void; onDeleteSimulationStage: (id: string) => void; onSave: () => void | Promise<void>; isSaving: boolean; syncConfirmed: boolean }) {
+function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedMonthChange, onNewGoal, onOpenPipeline, onEditGoal, onDeleteGoal, onReorderGoals, cadenceBlocks, onAddCadenceBlock, onMoveCadenceBlock, onEditCadenceBlock, onDeleteCadenceBlock, simulationStages, services, funnels, onAddSimulationStage, onUpdateSimulationStage, onDeleteSimulationStage, onSave, isSaving, syncConfirmed }: { goals: GoalItem[]; averageGoalProgress: number; selectedMonth: string; onSelectedMonthChange: (month: string) => void; onNewGoal: () => void; onOpenPipeline: () => void; onEditGoal: (goal: GoalItem) => void; onDeleteGoal: (id: string) => void; onReorderGoals: (fromId: string, toId: string) => void; cadenceBlocks: CadenceBlock[]; onAddCadenceBlock: (day: number, slot: CadenceSlot, details?: Pick<CadenceBlock, "title" | "channel" | "notes">) => void; onMoveCadenceBlock: (id: string, day: number, slot: CadenceSlot) => void; onEditCadenceBlock: (block: CadenceBlock) => void; onDeleteCadenceBlock: (id: string) => void; simulationStages: GoalSimulationStage[]; services: Service[]; funnels: SalesFunnel[]; onAddSimulationStage: () => void; onUpdateSimulationStage: (id: string, field: "name" | "color" | "probability" | "projectionMode" | "fixedValue" | "productId" | "conversionStageId", value: string | number) => void; onDeleteSimulationStage: (id: string) => void; onSave: () => void | Promise<void>; isSaving: boolean; syncConfirmed: boolean }) {
   const daysRemaining = daysUntilMonthEnd();
   const currentMonth = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date(`${selectedMonth}-01T12:00:00`));
   const calendar = useMemo(() => {
@@ -1958,7 +1960,7 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
   return (
     <div className="pt-[68px] md:pt-0">
       <header className="flex min-h-[116px] items-center justify-between px-5 py-6 md:px-10">
-        <div><p className="eyebrow">Plano mensal <span className="mx-1 text-[#10A97A]">•</span> ciclo em andamento</p><h1 className="page-title">Metas <span className="text-[#10A97A]">em movimento</span></h1></div>
+        <div><p className="eyebrow">Plano mensal <span className="mx-1 text-[#10A97A]">•</span> ciclo em andamento</p><h1 className="page-title">Planos e Metas <span className="text-[#10A97A]">em movimento</span></h1></div>
         <div className="hidden items-center gap-3 sm:flex"><label className="flex items-center gap-2 rounded-xl border border-[#DDE8E0] bg-white px-3 text-xs font-bold uppercase tracking-[0.08em] text-[#6E7C74]">Mês <Input type="month" value={selectedMonth} onChange={(event) => onSelectedMonthChange(event.target.value)} className="h-9 w-[132px] border-0 bg-transparent p-0 text-sm font-bold normal-case tracking-normal text-[#1B2522] shadow-none focus-visible:ring-0" aria-label="Filtrar mês das metas" /></label><button className="tool-button" onClick={onOpenPipeline}><Search size={18} /><span>Ver funil</span></button><Button onClick={onNewGoal} className="h-11 gap-2 rounded-xl bg-[#10A97A] px-5 font-bold hover:bg-[#087E5A]"><Plus size={18} />Nova meta</Button></div>
       </header>
 
@@ -1980,6 +1982,7 @@ function GoalsWorkspace({ goals, averageGoalProgress, selectedMonth, onSelectedM
                 return <span key={`day-${index}`} title={isHoliday ? "Feriado nacional" : isWeekend ? "Fim de semana" : undefined} className={`rounded-md py-1 ${isToday ? isRedDay ? "bg-[#C62828] font-black text-white ring-1 ring-[#A61B1B] shadow-sm" : "bg-[#E5BE6B] text-[#5E4310] shadow-sm" : isRedDay ? "bg-[#FFE6E3] font-black text-[#B42318]" : "text-[#A87520]"}`}>{day ?? ""}</span>;
               })}</div></div></div>
         </section>
+        <CadenceWorkspace blocks={cadenceBlocks} onAdd={onAddCadenceBlock} onMove={onMoveCadenceBlock} onEdit={onEditCadenceBlock} onDelete={onDeleteCadenceBlock} />
         <GoalSimulator stages={simulationStages} services={services} funnels={funnels} onAddStage={onAddSimulationStage} onUpdateStage={onUpdateSimulationStage} onDeleteStage={onDeleteSimulationStage} onSave={onSave} isSaving={isSaving} syncConfirmed={syncConfirmed} />
       </div>
     </div>
@@ -2173,9 +2176,9 @@ function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks:
   const openCreate = (day: number, slot: CadenceSlot) => { setCreateSlot({ day, slot }); setDraft({ id: "", day, slot, title: "", channel: "E-mail", notes: "" }); };
   const saveDraft = () => { if (draft?.title.trim()) { if (createSlot) { onAdd(createSlot.day, createSlot.slot, { title: draft.title, channel: draft.channel, notes: draft.notes }); } else { onEdit(draft); } setDraft(null); setCreateSlot(null); } };
 
-  return <div className="min-h-screen bg-[#F6F5F1] px-4 pb-10 pt-[84px] md:px-8 md:pt-8">
-    <div className="mx-auto max-w-[1500px]">
-      <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+  return <section className="mt-5 overflow-hidden rounded-2xl border border-[#E0E5DF] bg-[#FBFBF9] shadow-[0_14px_36px_rgba(27,37,34,0.05)]">
+    <div className="mx-auto max-w-[1500px] px-4 pb-4 pt-4 md:px-5 md:pb-5">
+      <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
         <div><p className="eyebrow">Operação comercial</p><h1 className="font-display text-3xl font-extrabold tracking-[-0.06em] text-[#1B2522]">Cadência de prospecção</h1><p className="mt-1 max-w-xl text-sm font-medium text-[#77827C]">Desenhe a sequência de contatos por dia e turno. Arraste os blocos para reorganizar o ritmo.</p></div>
         <div className="flex items-center gap-2"><span className="rounded-full bg-[#E8F6F0] px-3 py-1.5 text-xs font-bold text-[#087E5A]">{blocks.length} {blocks.length === 1 ? "ação" : "ações"} planejadas</span></div>
       </div>
@@ -2193,7 +2196,7 @@ function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks:
       <p className="mt-3 text-xs font-medium text-[#87928D]">Dica: arraste um bloco para uma célula vazia. Dê duplo clique ou use “Editar” para alterar canal, título e observações.</p>
     </div>
     <Dialog open={Boolean(draft)} onOpenChange={(open) => { if (!open) { setDraft(null); setCreateSlot(null); } }}><DialogContent className="max-w-[480px] border-[#E2E7E0] bg-[#FCFCFA]"><DialogHeader><DialogTitle className="font-display text-2xl tracking-[-0.04em]">{createSlot ? "Nova ação da cadência" : "Editar ação da cadência"}</DialogTitle><DialogDescription>Defina a mensagem e o canal desse ponto da sequência.</DialogDescription></DialogHeader>{draft && <div className="space-y-4"><div><Label>Título</Label><Input className="mt-1" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div><div><Label>Canal</Label><select className="form-select mt-1" value={draft.channel} onChange={(event) => setDraft({ ...draft, channel: event.target.value as CadenceChannel })}>{channels.map((channel) => <option key={channel}>{channel}</option>)}</select></div><div><Label>Observações</Label><textarea className="form-textarea mt-1 min-h-[110px]" value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setDraft(null)}>Cancelar</Button><Button onClick={saveDraft} className="bg-[#10A97A] hover:bg-[#087E5A]">Salvar ação</Button></div></div>}</DialogContent></Dialog>
-  </div>;
+  </section>;
 }
 
 function PipelineWorkspace({ funnels, activeFunnel, activeFunnelId, deals, wonDeals, lostDeals, wonStage, lostStage, totalPipeline, weightedPipeline, draggedDealId, overStageId, draggedStageId, overStageReorderId, onSelectFunnel, onNewFunnel, onEditFunnel, onNewDeal, onEditDeal, onDeleteDeal, onNewStage, onEditStage, onDragStart, onDrop, onWinDrop, onLoseDrop, onDragOver, onDragEnd, onStageDragStart, onStageDragOver, onStageDrop, onStageDragEnd }: { funnels: SalesFunnel[]; activeFunnel?: SalesFunnel; activeFunnelId: string; deals: Deal[]; wonDeals: Deal[]; lostDeals: Deal[]; wonStage?: Stage; lostStage?: Stage; totalPipeline: number; weightedPipeline: number; draggedDealId: string | null; overStageId: string | null; draggedStageId: string | null; overStageReorderId: string | null; onSelectFunnel: (id: string) => void; onNewFunnel: () => void; onEditFunnel: () => void; onNewDeal: () => void; onEditDeal: (deal: Deal) => void; onDeleteDeal: (deal: Deal) => void; onNewStage: () => void; onEditStage: (stage: Stage) => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onDrop: (stageId: string, event?: DragEvent<HTMLElement>) => void; onWinDrop: (event?: DragEvent<HTMLElement>) => void; onLoseDrop: (event?: DragEvent<HTMLElement>) => void; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDragEnd: () => void; onStageDragStart: (event: DragEvent<HTMLElement>, stageId: string) => void; onStageDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onStageDrop: (stageId: string, event?: DragEvent<HTMLElement>) => void; onStageDragEnd: () => void }) {
