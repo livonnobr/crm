@@ -314,3 +314,5 @@
 - [x] Remover as frases verdes de vínculo automático dos cards de Metas, mantendo apenas os dados essenciais
 
 - [x] Aumentar o título de cada card de meta mantendo a responsividade e os controles atuais
+
+- [x] Adicionar um calendário visual do mês como fundo do card Fechamento do mês, preservando contraste e legibilidade
