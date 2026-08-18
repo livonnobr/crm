@@ -370,3 +370,6 @@
 - [x] Auditar divergência entre GitHub, branch ritmo-crm, projeto Vercel e domínio público após alterações que não apareceram no deploy; GitHub e Vercel estão no commit 2f9af45 e o domínio oficial serve a tela própria de login
 
 - [x] Remover o aviso “Rascunho local — ainda não está salvo no Supabase” da aba Empresas e exibir apenas sincronização automática
+
+- [x] Permitir arrastar e soltar para reorganizar as etapas do funil, persistindo a nova ordem
+- [x] Ignorar a primeira etapa do funil na projeção do simulador de metas

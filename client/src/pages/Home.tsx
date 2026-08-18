@@ -66,6 +66,7 @@ import { summarizeFinanceEntries } from "@/lib/finance";
 import { cleanGoalPeriod, goalPeriodInputType, goalPeriodInputValue, goalPeriodValue as goalPeriodValueFromHelper, periodValueForDate } from "@/lib/goal-period";
 import { businessDaysUntilMonthEnd } from "@/lib/business-days";
 import { persistenceActionLabel, persistenceLabel } from "@/lib/persistence-status";
+import { projectFunnelStages, reorderFunnelStages } from "@/lib/funnel-utils";
 import { trpc } from "@/lib/trpc";
 
 type Page = "goals" | "pipeline" | "activities" | "people" | "prospecting" | "cadence" | "finance";
@@ -593,6 +594,8 @@ export default function Home() {
   const [stageDraft, setStageDraft] = useState<Stage>({ id: "", name: "", color: "#10A97A", probability: 20 });
   const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
   const [overStageId, setOverStageId] = useState<string | null>(null);
+  const [draggedStageId, setDraggedStageId] = useState<string | null>(null);
+  const [overStageReorderId, setOverStageReorderId] = useState<string | null>(null);
   const [detailDealId, setDetailDealId] = useState<string | null>(null);
   const [deleteDealId, setDeleteDealId] = useState<string | null>(null);
   const pendingDeleteDeal = deals.find((deal) => deal.id === deleteDealId) ?? null;
@@ -1200,6 +1203,44 @@ export default function Home() {
     setOverStageId(null);
   }
 
+  function clearStageReorderState() {
+    setDraggedStageId(null);
+    setOverStageReorderId(null);
+  }
+
+  function startStageReorder(event: DragEvent<HTMLElement>, stageId: string) {
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-ritmo-stage", stageId);
+    setDraggedStageId(stageId);
+  }
+
+  function reorderStage(stageId: string, event?: DragEvent<HTMLElement>) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const sourceId = draggedStageId ?? event?.dataTransfer.getData("application/x-ritmo-stage");
+    if (!activeFunnel || !sourceId || sourceId === stageId) {
+      clearStageReorderState();
+      return;
+    }
+    setFunnels((current) => current.map((funnel) => {
+      if (funnel.id !== activeFunnel.id) return funnel;
+      const stages = reorderFunnelStages(funnel.stages, sourceId, stageId);
+      return stages === funnel.stages ? funnel : { ...funnel, stages };
+    }));
+    clearStageReorderState();
+    toast.success("Etapas reorganizadas.");
+  }
+
+  function allowStageReorder(event: DragEvent<HTMLElement>, stageId: string) {
+    const sourceId = draggedStageId ?? event.dataTransfer.getData("application/x-ritmo-stage");
+    if (!sourceId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    setOverStageReorderId(stageId);
+  }
+
   function moveDeal(stageId: string, event?: DragEvent<HTMLElement>) {
     event?.preventDefault();
     const dealId = draggedDealId ?? event?.dataTransfer.getData("text/plain");
@@ -1496,6 +1537,12 @@ export default function Home() {
             onEditFunnel={openEditFunnel}
             onNewDeal={openNewDeal}
             onEditDeal={openDealDetail}
+            draggedStageId={draggedStageId}
+            overStageReorderId={overStageReorderId}
+            onStageDragStart={startStageReorder}
+            onStageDragOver={allowStageReorder}
+            onStageDrop={reorderStage}
+            onStageDragEnd={clearStageReorderState}
             onDeleteDeal={(deal) => setDeleteDealId(deal.id)}
             onNewStage={openNewStage}
             onEditStage={openEditStage}
@@ -1752,14 +1799,7 @@ function GoalSimulator({ funnels, conversionRates, onSaveConversionRates }: { fu
   if (!activeFunnel) return null;
 
   const leads = Math.max(0, Number(leadInput) || 0);
-  const simulatorStages = activeFunnel.stages.filter((stage) => !isLostStage(stage)).sort((left, right) => Number(isWonStage(left)) - Number(isWonStage(right)));
-  let enteringStage = leads;
-  const projections = simulatorStages.map((stage, index) => {
-    const rate = index === 0 ? 100 : Math.min(100, Math.max(0, Number(draftRates[stage.id] ?? stage.probability) || 0));
-    const projected = index === 0 ? enteringStage : enteringStage * (rate / 100);
-    enteringStage = projected;
-    return { stage, rate, projected };
-  });
+  const projections = projectFunnelStages(activeFunnel.stages, leads, draftRates, isWonStage, isLostStage);
   const finalProjection = projections.find(({ stage }) => isWonStage(stage))?.projected ?? projections.at(-1)?.projected ?? 0;
   const numberFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
   const updateRate = (stageId: string, value: string) => setDraftRates((current) => ({ ...current, [stageId]: Math.min(100, Math.max(0, Number(value) || 0)) }));
@@ -1932,7 +1972,7 @@ function CadenceWorkspace({ blocks, onAdd, onMove, onEdit, onDelete }: { blocks:
   </div>;
 }
 
-function PipelineWorkspace({ funnels, activeFunnel, activeFunnelId, deals, wonDeals, lostDeals, wonStage, lostStage, totalPipeline, weightedPipeline, draggedDealId, overStageId, onSelectFunnel, onNewFunnel, onEditFunnel, onNewDeal, onEditDeal, onDeleteDeal, onNewStage, onEditStage, onDragStart, onDrop, onWinDrop, onLoseDrop, onDragOver, onDragEnd }: { funnels: SalesFunnel[]; activeFunnel?: SalesFunnel; activeFunnelId: string; deals: Deal[]; wonDeals: Deal[]; lostDeals: Deal[]; wonStage?: Stage; lostStage?: Stage; totalPipeline: number; weightedPipeline: number; draggedDealId: string | null; overStageId: string | null; onSelectFunnel: (id: string) => void; onNewFunnel: () => void; onEditFunnel: () => void; onNewDeal: () => void; onEditDeal: (deal: Deal) => void; onDeleteDeal: (deal: Deal) => void; onNewStage: () => void; onEditStage: (stage: Stage) => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onDrop: (stageId: string, event?: DragEvent<HTMLElement>) => void; onWinDrop: (event?: DragEvent<HTMLElement>) => void; onLoseDrop: (event?: DragEvent<HTMLElement>) => void; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDragEnd: () => void }) {
+function PipelineWorkspace({ funnels, activeFunnel, activeFunnelId, deals, wonDeals, lostDeals, wonStage, lostStage, totalPipeline, weightedPipeline, draggedDealId, overStageId, draggedStageId, overStageReorderId, onSelectFunnel, onNewFunnel, onEditFunnel, onNewDeal, onEditDeal, onDeleteDeal, onNewStage, onEditStage, onDragStart, onDrop, onWinDrop, onLoseDrop, onDragOver, onDragEnd, onStageDragStart, onStageDragOver, onStageDrop, onStageDragEnd }: { funnels: SalesFunnel[]; activeFunnel?: SalesFunnel; activeFunnelId: string; deals: Deal[]; wonDeals: Deal[]; lostDeals: Deal[]; wonStage?: Stage; lostStage?: Stage; totalPipeline: number; weightedPipeline: number; draggedDealId: string | null; overStageId: string | null; draggedStageId: string | null; overStageReorderId: string | null; onSelectFunnel: (id: string) => void; onNewFunnel: () => void; onEditFunnel: () => void; onNewDeal: () => void; onEditDeal: (deal: Deal) => void; onDeleteDeal: (deal: Deal) => void; onNewStage: () => void; onEditStage: (stage: Stage) => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onDrop: (stageId: string, event?: DragEvent<HTMLElement>) => void; onWinDrop: (event?: DragEvent<HTMLElement>) => void; onLoseDrop: (event?: DragEvent<HTMLElement>) => void; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDragEnd: () => void; onStageDragStart: (event: DragEvent<HTMLElement>, stageId: string) => void; onStageDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onStageDrop: (stageId: string, event?: DragEvent<HTMLElement>) => void; onStageDragEnd: () => void }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [showWonSales, setShowWonSales] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -1950,7 +1990,7 @@ function PipelineWorkspace({ funnels, activeFunnel, activeFunnelId, deals, wonDe
   return <div className="pipeline-shell pt-[68px] md:pt-0"><header><div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"><div className="flex min-w-0 flex-wrap items-center gap-2.5"><div className="flex items-center gap-2"><h1 className="page-title">Funil de vendas</h1><span className="hidden h-2 w-2 rounded-full bg-[#10A97A] sm:block" /></div><span className="hidden h-5 w-px bg-[#DDE4DE] sm:block" /><div className="relative"><select aria-label="Selecionar funil" className="funnel-selector appearance-none" value={activeFunnelId} onChange={(event) => onSelectFunnel(event.target.value)}>{funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#77847E]" /></div><button onClick={onEditFunnel} className="icon-button" aria-label="Editar funil"><Pencil size={16} /></button><button onClick={onNewFunnel} className="hidden items-center gap-1.5 text-sm font-bold text-[#087E5A] sm:flex"><CirclePlus size={17} />Novo funil</button></div><div className="flex flex-wrap items-center gap-2"><div className="flex gap-2"><MiniMetric label="Em aberto" value={formatCurrency(totalPipeline)} /><MiniMetric label="Previsão" value={formatCurrency(weightedPipeline)} accent /></div><button className={`tool-button ${showWonSales ? "bg-[#E8F6F0] text-[#087E5A]" : ""}`} onClick={() => setShowWonSales((open) => !open)} aria-pressed={showWonSales}><CircleDollarSign size={16} /><span>Vendas ({wonDeals.length})</span></button><button className={`icon-button hidden sm:grid ${filterOpen || searchTerm ? "bg-[#E8F6F0] text-[#087E5A]" : ""}`} onClick={() => setFilterOpen((open) => !open)} aria-label="Filtrar oportunidades" aria-expanded={filterOpen}><Filter size={17} /></button><button className={`tool-button hidden sm:flex ${compactView ? "bg-[#E8F6F0] text-[#087E5A]" : ""}`} onClick={() => setCompactView((compact) => !compact)} aria-pressed={compactView}><SlidersHorizontal size={17} /><span>{compactView ? "Confortável" : "Compacta"}</span></button><Button onClick={onNewDeal} className="h-10 gap-2 rounded-xl bg-[#10A97A] px-4 font-bold hover:bg-[#087E5A]"><Plus size={18} />Oportunidade</Button></div></div></header>
     {filterOpen && <div className="mx-5 mt-4 flex items-center gap-3 rounded-2xl border border-[#DDE8E0] bg-[#F7FBF8] p-3 md:mx-8"><Search size={16} className="text-[#6F7D75]" /><Input autoFocus value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por negócio, empresa ou etiqueta" className="h-9 max-w-sm border-0 bg-transparent shadow-none focus-visible:ring-0" /><span className="ml-auto text-xs font-semibold text-[#7B8882]">{visibleDeals.length} em aberto</span></div>}
     {showWonSales && <section className="mx-5 mt-4 rounded-[24px] border border-[#BDE5D5] bg-[#F3FBF7] p-4 md:mx-8 md:p-5"><div className="flex flex-col gap-3 border-b border-[#D8EEE3] pb-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="eyebrow text-[#087E5A]">Histórico comercial</p><h2 className="font-display text-xl font-extrabold tracking-[-0.04em] text-[#1F3029]">Vendas convertidas</h2><p className="mt-1 text-xs font-medium text-[#6C8177]">Cards que foram movidos para Ganho neste funil.</p></div><div className="text-left sm:text-right"><p className="text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#6C8177]">Valor ganho</p><p className="mt-0.5 font-display text-lg font-extrabold tracking-[-0.04em] text-[#087E5A]">{formatCurrency(wonSalesValue)}</p></div></div><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{visibleWonDeals.map((deal) => <DealCard key={deal.id} deal={deal} isDragging={false} readOnly onEdit={() => onEditDeal(deal)} onDelete={() => onDeleteDeal(deal)} onDragStart={onDragStart} onDragEnd={onDragEnd} />)}{visibleWonDeals.length === 0 && <div className="sm:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-[#BBDCCD] bg-white/60 px-5 py-8 text-center text-sm font-medium text-[#6F8178]">Nenhuma venda convertida encontrada{searchTerm ? " para esta busca" : " ainda"}.</div>}</div></section>}
-    <div className="relative overflow-hidden px-5 pb-5 pt-4 md:px-8"><div className="pointer-events-none absolute right-8 top-2 hidden h-44 w-80 overflow-hidden rounded-full opacity-[0.13] xl:block"><img src={funnelArtUrl} alt="" className="h-full w-full object-cover" /></div><div className="relative z-10 overflow-x-auto pb-3"><div className="flex min-w-max items-stretch gap-4">{activeFunnel?.stages.filter((stage) => !isWonStage(stage) && !isLostStage(stage)).map((stage) => <PipelineColumn key={stage.id} stage={stage} deals={visibleDeals.filter((deal) => deal.stageId === stage.id)} isOver={overStageId === stage.id} draggedDealId={draggedDealId} onEditStage={() => onEditStage(stage)} onEditDeal={onEditDeal} onDeleteDeal={onDeleteDeal} onDragStart={onDragStart} compactView={compactView} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd} />)}<button onClick={onNewStage} className="stage-add-button"><CirclePlus size={20} /><span>Nova etapa</span></button></div></div>
+    <div className="relative overflow-hidden px-5 pb-5 pt-4 md:px-8"><div className="pointer-events-none absolute right-8 top-2 hidden h-44 w-80 overflow-hidden rounded-full opacity-[0.13] xl:block"><img src={funnelArtUrl} alt="" className="h-full w-full object-cover" /></div><div className="relative z-10 overflow-x-auto pb-3"><div className="flex min-w-max items-stretch gap-4">{activeFunnel?.stages.filter((stage) => !isWonStage(stage) && !isLostStage(stage)).map((stage) => <PipelineColumn key={stage.id} stage={stage} deals={visibleDeals.filter((deal) => deal.stageId === stage.id)} isOver={overStageId === stage.id} draggedDealId={draggedDealId} draggedStageId={draggedStageId} isStageReorderTarget={overStageReorderId === stage.id} onEditStage={() => onEditStage(stage)} onEditDeal={onEditDeal} onDeleteDeal={onDeleteDeal} onDragStart={onDragStart} onStageDragStart={onStageDragStart} onStageDragOver={onStageDragOver} onStageDrop={onStageDrop} onStageDragEnd={onStageDragEnd} compactView={compactView} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd} />)}<button onClick={onNewStage} className="stage-add-button"><CirclePlus size={20} /><span>Nova etapa</span></button></div></div>
       <div className={`outcome-dropzones ${draggedDealId ? "outcome-dropzones-dragging" : ""}`} aria-live="polite"><OutcomeDropzone type="won" stage={wonStage} deals={wonDeals} isOver={wonStage ? overStageId === wonStage.id : overStageId === "won"} onDragOver={onDragOver} onDrop={onWinDrop} /><OutcomeDropzone type="lost" stage={lostStage} deals={lostDeals} isOver={overStageId === "lost" || (lostStage ? overStageId === lostStage.id : false)} onDragOver={(event) => onDragOver(event, lostStage?.id ?? "lost")} onDrop={onLoseDrop} /></div>
       <div className="mt-3 flex items-center gap-2 text-xs text-[#728079]"><GripVertical size={15} /><span>{draggedDealId ? "Solte a oportunidade em Ganho ou Perdido para concluir a decisão." : "Arraste oportunidades entre as etapas; Ganho e Perdido ficam no rodapé."}</span></div></div></div>;
 }
@@ -1966,10 +2006,10 @@ function OutcomeDropzone({ type, stage, deals, isOver, onDragOver, onDrop }: { t
   return <section onDragEnterCapture={(event) => onDragOver(event, stageId)} onDragOverCapture={(event) => onDragOver(event, stageId)} onDropCapture={(event) => { event.preventDefault(); event.stopPropagation(); onDrop(event); }} className={`outcome-dropzone outcome-dropzone-${type} ${isOver ? `outcome-dropzone-${type}-over` : ""}`} aria-label={isWon ? "Zona de ganho" : "Zona de oportunidade perdida"}><div className="flex min-w-0 items-center gap-3"><div className="outcome-dropzone-icon">{isWon ? <CircleDollarSign size={19} /> : <X size={20} />}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[0.15em] opacity-75">Decisão comercial</p><h2 className="font-display text-base font-extrabold tracking-[-0.035em]">{isWon ? "Ganhar oportunidade" : "Marcar como perdido"}</h2></div></div><div className="ml-auto hidden items-center gap-4 text-right sm:flex"><div><p className="text-[9px] font-bold uppercase tracking-[0.13em] opacity-75">{isWon ? "Ganhas" : "Perdidas"}</p><p className="font-display mt-0.5 text-sm font-extrabold tracking-[-0.04em]">{deals.length}</p></div><div><p className="text-[9px] font-bold uppercase tracking-[0.13em] opacity-75">Valor</p><p className="font-display mt-0.5 text-sm font-extrabold tracking-[-0.04em]">{formatCurrency(totalValue)}</p></div></div></section>;
 }
 
-function PipelineColumn({ stage, deals, isOver, draggedDealId, compactView, onEditStage, onEditDeal, onDeleteDeal, onDragStart, onDragOver, onDrop, onDragEnd }: { stage: Stage; deals: Deal[]; isOver: boolean; draggedDealId: string | null; compactView: boolean; onEditStage: () => void; onEditDeal: (deal: Deal) => void; onDeleteDeal: (deal: Deal) => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDrop: (stageId: string, event?: DragEvent<HTMLElement>) => void; onDragEnd: () => void }) {
+function PipelineColumn({ stage, deals, isOver, draggedDealId, draggedStageId, isStageReorderTarget, compactView, onEditStage, onEditDeal, onDeleteDeal, onDragStart, onStageDragStart, onStageDragOver, onStageDrop, onStageDragEnd, onDragOver, onDrop, onDragEnd }: { stage: Stage; deals: Deal[]; isOver: boolean; draggedDealId: string | null; draggedStageId: string | null; isStageReorderTarget: boolean; compactView: boolean; onEditStage: () => void; onEditDeal: (deal: Deal) => void; onDeleteDeal: (deal: Deal) => void; onDragStart: (event: DragEvent<HTMLElement>, dealId: string) => void; onStageDragStart: (event: DragEvent<HTMLElement>, stageId: string) => void; onStageDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onStageDrop: (stageId: string, event?: DragEvent<HTMLElement>) => void; onStageDragEnd: () => void; onDragOver: (event: DragEvent<HTMLElement>, stageId: string) => void; onDrop: (stageId: string, event?: DragEvent<HTMLElement>) => void; onDragEnd: () => void }) {
   const columnValue = deals.reduce((sum, deal) => sum + deal.value, 0);
   const estimatedColumnValue = columnValue * (stage.probability / 100);
-  return <section onDragOver={(event) => onDragOver(event, stage.id)} onDrop={(event) => { event.preventDefault(); onDrop(stage.id, event); }} className={`pipeline-column ${isOver ? "pipeline-column-over" : ""}`}><header className="mb-4 flex items-center gap-2 px-1"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} /><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-extrabold text-[#2C3632]">{stage.name}</h2><p className="mt-0.5 text-xs text-[#7B8882]">{deals.length} {deals.length === 1 ? "negócio" : "negócios"} · {stage.probability}%</p></div><button onClick={onEditStage} className="icon-button h-7 w-7 opacity-70 hover:opacity-100" aria-label={`Editar etapa ${stage.name}`}><MoreHorizontal size={16} /></button></header><div className="column-instrument-grid mb-4 grid grid-cols-2 gap-2 px-1 py-2.5"><div><p className="text-[9px] font-extrabold uppercase tracking-[0.11em] text-[#829089]">Em aberto</p><p className="column-value mt-0.5 text-sm font-extrabold tracking-[-0.02em] text-[#44524C]">{formatCurrency(columnValue)}</p></div><div className="column-estimated-value border-l border-[#DCE9E2] pl-2.5"><p className="text-[9px] font-extrabold uppercase tracking-[0.11em] text-[#0A8C65]">Estimado</p><p className="mt-0.5 text-sm font-extrabold tracking-[-0.02em] text-[#087E5A]">{formatCurrency(estimatedColumnValue)}</p></div></div><div className={`min-h-[420px] space-y-3 ${compactView ? "[&_.deal-card]:!p-3 [&_.deal-card]:!min-h-0 [&_.deal-card_h3]:!text-sm [&_.deal-card_.mt-4]:!mt-2" : ""}`}>{deals.map((deal) => <DealCard key={deal.id} deal={deal} isDragging={draggedDealId === deal.id} onEdit={() => onEditDeal(deal)} onDelete={() => onDeleteDeal(deal)} onDragStart={onDragStart} onDragEnd={onDragEnd} />)}{deals.length === 0 && <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[#D6DED8] bg-white/45 p-4 text-center text-xs font-medium text-[#87928D]">Solte uma oportunidade aqui</div>}</div></section>;
+  return <section onDragOver={(event) => onDragOver(event, stage.id)} onDrop={(event) => { event.preventDefault(); onDrop(stage.id, event); }} className={`pipeline-column ${isOver ? "pipeline-column-over" : ""} ${isStageReorderTarget ? "ring-2 ring-[#10A97A]/40" : ""}`}><header draggable onDragStart={(event) => onStageDragStart(event, stage.id)} onDragOver={(event) => onStageDragOver(event, stage.id)} onDrop={(event) => onStageDrop(stage.id, event)} onDragEnd={onStageDragEnd} className={`mb-4 flex cursor-grab items-center gap-2 rounded-xl px-1 ${draggedStageId === stage.id ? "opacity-50" : ""}`}><GripVertical size={15} className="shrink-0 text-[#9AA79F]" aria-hidden="true" /><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} /><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-extrabold text-[#2C3632]">{stage.name}</h2><p className="mt-0.5 text-xs text-[#7B8882]">{deals.length} {deals.length === 1 ? "negócio" : "negócios"} · {stage.probability}%</p></div><button onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClickCapture={onEditStage} className="icon-button h-7 w-7 opacity-70 hover:opacity-100" aria-label={`Editar etapa ${stage.name}`}><MoreHorizontal size={16} /></button></header><div className="column-instrument-grid mb-4 grid grid-cols-2 gap-2 px-1 py-2.5"><div><p className="text-[9px] font-extrabold uppercase tracking-[0.11em] text-[#829089]">Em aberto</p><p className="column-value mt-0.5 text-sm font-extrabold tracking-[-0.02em] text-[#44524C]">{formatCurrency(columnValue)}</p></div><div className="column-estimated-value border-l border-[#DCE9E2] pl-2.5"><p className="text-[9px] font-extrabold uppercase tracking-[0.11em] text-[#0A8C65]">Estimado</p><p className="mt-0.5 text-sm font-extrabold tracking-[-0.02em] text-[#087E5A]">{formatCurrency(estimatedColumnValue)}</p></div></div><div className={`min-h-[420px] space-y-3 ${compactView ? "[&_.deal-card]:!p-3 [&_.deal-card]:!min-h-0 [&_.deal-card_h3]:!text-sm [&_.deal-card_.mt-4]:!mt-2" : ""}`}>{deals.map((deal) => <DealCard key={deal.id} deal={deal} isDragging={draggedDealId === deal.id} onEdit={() => onEditDeal(deal)} onDelete={() => onDeleteDeal(deal)} onDragStart={onDragStart} onDragEnd={onDragEnd} />)}{deals.length === 0 && <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[#D6DED8] bg-white/45 p-4 text-center text-xs font-medium text-[#87928D]">Solte uma oportunidade aqui</div>}</div></section>;
 }
 
 function FinanceWorkspace({ entries, onAdd, onUpdate, onDelete }: { entries: FinanceEntry[]; onAdd: () => void; onUpdate: (id: string, field: keyof Omit<FinanceEntry, "id">, value: string | number) => void; onDelete: (id: string) => void }) {
